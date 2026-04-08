@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AO BCEF — PWise Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f5f7fa; color: #1a1a2e; }
+  .wrap { max-width: 1260px; margin: 0 auto; padding: 20px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .header-bar { width: 6px; height: 40px; background: linear-gradient(180deg, #00915a, #00643e); border-radius: 3px; }
+  .header h1 { font-size: 23px; font-weight: 700; letter-spacing: -0.5px; }
+  .header p { font-size: 13px; color: #666; margin-top: 2px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 10px; padding: 12px 16px; border: 1px solid #e2e8f0; }
+  .stat-card.clickable { cursor: pointer; transition: box-shadow 0.15s; }
+  .stat-card.clickable:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .stat-card.clickable.active { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+  .stat-val { font-size: 28px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .stat-val.green { color: #00915a; }
+  .stat-val.red { color: #dc2626; }
+  .stat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  /* Filters */
+  .filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filters input, .filters select { padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; outline: none; background: #fff; }
+  .filters input { flex: 1; min-width: 200px; }
+  .filters input:focus { border-color: #00915a; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { background: #f1f5f9; }
+  th { padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; user-select: none; }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: #00915a; }
+  td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+  tr.row { cursor: pointer; transition: background 0.12s; }
+  tr.row:hover { background: #f8fafc !important; }
+  tr.row.selected { background: #e0f2fe !important; }
+  tr.urg3 { background: #fef2f2; }
+  tr.urg2 { background: #fefce8; }
+  tr.urg1 { background: #f0fdf4; }
+  .rfc-code { font-family: monospace; font-size: 12px; color: #475569; }
+  .cat-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
+  .profil-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .org-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #64748b; }
+  .date-cell { white-space: nowrap; }
+  .fin-cell { color: #94a3b8; }
+  .jours-cell { text-align: right; font-weight: 600; }
+  th.jours-h { text-align: right; }
+
+  /* Detail */
+  .detail { margin-top: 14px; background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; padding: 16px; animation: slideIn 0.15s ease; }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .detail-codes { font-size: 11px; color: #94a3b8; font-family: monospace; }
+  .detail h3 { margin: 4px 0 10px; font-size: 16px; font-weight: 700; }
+  .detail-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; }
+  .detail-close:hover { color: #333; }
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 13px; }
+  .detail-grid .label { color: #94a3b8; font-size: 12px; }
+  .detail-grid strong { font-weight: 600; }
+
+  /* Footer */
+  .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; }
+
+  @media (max-width: 768px) {
+    .detail-grid { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <div class="header-bar"></div>
+    <div>
+      <h1>Appels d'Offres BCEF</h1>
+      <p>PWise — Consultations en cours</p>
+    </div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="filters">
+    <input type="text" id="search" placeholder="🔍 Rechercher RFC, profil, domaine...">
+    <select id="deptFilter"><option value="Tous">Tous départements</option></select>
+    <select id="catFilter"><option value="Tous">Toutes catégories</option></select>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" data-col="rfc">RFC <span class="sort-icon">↕</span></th>
+          <th>Cat.</th>
+          <th>Profil</th>
+          <th>Domaine</th>
+          <th class="sortable" data-col="dateDebut">Début <span class="sort-icon">↕</span></th>
+          <th>Fin</th>
+          <th class="sortable jours-h" data-col="nbJours">Jours <span class="sort-icon">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <div id="detail" style="display:none"></div>
+  <div class="footer">INTM — PWise AO Viewer · Mis à jour le <span id="updateDate"></span></div>
+</div>
+
+<script>
+// ====== DONNÉES BRUTES — COLLEZ ICI L'EXPORT PWISE ======
+const RAW_DATA = `btnMasterDetail
+RFC00004114
+BCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))
+TM00004671
+L6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Project Manager Risques IT & Cyber Sécurité Niveau 2
+Sur Site
+13/04/2026 - 31/12/2026
+151,00
+btnMasterDetail
+RFC00004045
+BCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java
+TM00004676
+L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Analyste / Développeur Niveau 5
+Sur Site
+20/04/2026 - 31/12/2026
+147,00
+btnMasterDetail
+RFC00004038
+BCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java
+TM00004675
+L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Analyste / Développeur Niveau 5
+Sur Site
+20/04/2026 - 31/12/2026
+147,00
+btnMasterDetail
+RFC00003897
+BCEF IT MDEP Nantes Intégrateur squad Xpay Estreem
+TM00004484
+L6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Analyste / Développeur Niveau 5
+Sur Site
+04/05/2026 - 31/12/2026
+140,00
+btnMasterDetail
+RFC00003890
+BCEF IT - Business Analyst Socle Data DHV2 (CS)
+TM00004420
+L6_BCEF IT - 2DAI 2 DATA IA
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
+Sur Site
+04/05/2026 - 31/12/2026
+140,00
+btnMasterDetail
+RFC00003863
+BCEF IT - BA - Crédits Pro ER (MCS)
+TM00004311
+L6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4
+Sur Site
+04/05/2026 - 31/12/2026
+140,00
+btnMasterDetail
+RFC00003855
+BCEF IT-DIFA 2-MBE Tech Lead Socle MBE (CS)
+TM00004407
+L6_BCEF IT - DIFA 2 ASSETS DIGITAUX CORPORATE ET TRANSVERSAUX
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Expert Technique Niveau 1
+Sur Site
+15/04/2026 - 31/12/2026
+150,00
+btnMasterDetail
+RFC00003835
+BCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2
+TM00004167
+L6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Analyste / Développeur Niveau 4
+Sur Site
+27/04/2026 - 31/12/2026
+143,00
+btnMasterDetail
+RFC00003827
+BCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2
+TM00004150
+L6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chef de Projet Technique Niveau 3
+Sur Site
+20/04/2026 - 31/12/2026
+147,00
+btnMasterDetail
+RFC00003797
+BCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)
+TM00004273
+L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
+Sur Site
+27/04/2026 - 31/12/2026
+143,00
+btnMasterDetail
+RFC00003728
+[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO
+TM00004424
+L6_BCEF RETAIL - ACQUISITIONS CLIENTS
+L4_BCEF RETAIL
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
+Sur Site
+27/04/2026 - 31/10/2026
+130,00
+btnMasterDetail
+RFC00003679
+BCEF IT - Assurance vie - Gestion de projet (MCS)
+TM00004330
+L6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chef de Projet Technique Niveau 4
+Sur Site
+27/04/2026 - 31/12/2026
+143,00
+btnMasterDetail
+RFC00003672
+BCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte
+TM00004274
+L6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2
+Sur Site
+03/06/2026 - 31/12/2026
+124,00
+btnMasterDetail
+RFC00003642
+BCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK
+TM00003799
+L6_BCEF RETAIL - ACQUISITIONS CLIENTS
+L4_BCEF RETAIL
+Réponse fournisseur en cours
+btnMasterDetail
+BCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA
+Sur Site
+13/04/2026 - 30/09/2026
+118,00
+btnMasterDetail
+RFC00003372
+BCEF IT - CBO - Analyse de Test - Contrat d'Offres (CLA)
+TM00003975
+L6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
+Sur Site
+30/03/2026 - 31/12/2026
+159,00
+btnMasterDetail
+RFC00003355
+Chargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)
+TM00003847
+L6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN
+L4_BCEF RETAIL
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2
+Sur Site
+06/04/2026 - 30/09/2026
+122,00
+btnMasterDetail
+RFC00003294
+BCEF IT - CP Senior Mise en oeuvre exigences DCC2 dans le Socle Crédit - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)
+TM00004067
+L6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chef de Projet IT Fonctionnel Niveau 4
+Sur Site
+01/04/2026 - 30/06/2026
+50,00
+btnMasterDetail
+RFC00003018
+BCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java
+TM00003880
+L6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Analyste / Développeur Niveau 5
+Sur Site
+06/04/2026 - 31/12/2026
+155,00
+btnMasterDetail
+RFC00002985
+BCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)
+TM00001894
+L6_BCEF IT - OSBA 4 EPARGNE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
+Sur Site
+02/03/2026 - 31/12/2026
+175,00
+btnMasterDetail
+RFC00001175
+BCEF IT - OSBA4 - Epargne - BA - Reporting Transverses
+TM00001974
+L6_BCEF IT - OSBA 4 EPARGNE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4
+Sur Site
+20/04/2026 - 31/12/2026
+147,00
+btnMasterDetail
+RFC00000929
+BCEF IT Projet Gestion Sous Mandat (CLA)
+TM00001888
+L6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE
+L4_BCEF IT
+Réponse fournisseur en cours
+btnMasterDetail
+Chef de Projet IT Fonctionnel Niveau 4
+Sur Site
+16/03/2026 - 31/12/2026
+167,00`;
+// ====== FIN DES DONNÉES ======
+
+// Parser
+function parseAOs(raw) {
+  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
+  const aos = [];
+  const noise = ["Prestation","Dates de mission","Nombre d'UO","TJM","Code","Demande d'achats","Organisation","Département","Date limite de réponses","Statut"];
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i] === "btnMasterDetail" && i+1 < lines.length && /^RFC\d+/.test(lines[i+1])) {
+      const rfc = lines[i+1];
+      const intitule = lines[i+2] || "";
+      let tm="", org="", dept="", statut="";
+      let j = i+3;
+      while (j < lines.length && lines[j] !== "btnMasterDetail") {
+        if (/^TM\d+/.test(lines[j])) tm = lines[j];
+        else if (/^L6T?_/.test(lines[j])) org = lines[j].replace(/^L6T?_/, "");
+        else if (lines[j].startsWith("L4_")) dept = lines[j].replace("L4_", "");
+        else if (!noise.includes(lines[j]) && !lines[j].includes("Enregistrement") && !lines[j].includes("Modifier le paramétrage")) statut = lines[j];
+        j++;
+      }
+      let profil="", modalite="", dateDebut="", dateFin="", nbJours=0;
+      if (j < lines.length && lines[j] === "btnMasterDetail") {
+        j++;
+        if (j < lines.length) { profil = lines[j]; j++; }
+        while (j < lines.length && lines[j] !== "btnMasterDetail") {
+          if (["Sur Site","Télétravail","Hybride"].includes(lines[j])) modalite = lines[j];
+          const dm = lines[j].match(/^(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})$/);
+          if (dm) { dateDebut = dm[1]; dateFin = dm[2]; }
+          const nm = lines[j].match(/^(\d+)[,.](\d+)$/);
+          if (nm) nbJours = parseInt(nm[1]);
+          j++;
+        }
+      }
+      if (rfc) aos.push({ rfc, intitule, tm, org, dept, statut, profil, modalite, dateDebut, dateFin, nbJours });
+      i = j;
+    } else { i++; }
+  }
+  return aos;
+}
+
+function categorize(p) {
+  const l = p.toLowerCase();
+  if (/développeur|software|cobol|intégrateur/.test(l)) return "Dev";
+  if (/business analyst|chargé de mission|consultant fonctionnel|analyse de test/.test(l)) return "BA";
+  if (/chef de projet|project manager/.test(l)) return "CdP";
+  if (/expert technique|tech lead/.test(l)) return "Expert";
+  return "Autre";
+}
+const CAT_COLORS = { Dev:"#3b82f6", BA:"#8b5cf6", CdP:"#f59e0b", Expert:"#ef4444", Autre:"#6b7280" };
+
+function parseDate(d) { if(!d) return null; const [day,month,year]=d.split("/"); return new Date(year,month-1,day); }
+function urgency(d) { const dt=parseDate(d); if(!dt) return 0; const diff=(dt-new Date())/(86400000); if(diff<0) return 3; if(diff<=7) return 2; if(diff<=21) return 1; return 0; }
+function shortOrg(o) { return o.replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,35); }
+
+// State
+let aos = parseAOs(RAW_DATA);
+let state = { search:"", catFilter:"Tous", deptFilter:"Tous", sortBy:"dateDebut", sortDir:1, selected:null };
+
+function getFiltered() {
+  let f = aos;
+  if (state.search) { const s=state.search.toLowerCase(); f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept].some(v=>v.toLowerCase().includes(s))); }
+  if (state.catFilter!=="Tous") f=f.filter(a=>categorize(a.profil)===state.catFilter);
+  if (state.deptFilter!=="Tous") f=f.filter(a=>a.dept===state.deptFilter);
+  f=[...f].sort((a,b)=>{
+    if(state.sortBy==="dateDebut") return state.sortDir*((parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0));
+    if(state.sortBy==="nbJours") return state.sortDir*(a.nbJours-b.nbJours);
+    return state.sortDir*a.rfc.localeCompare(b.rfc);
+  });
+  return f;
+}
+
+function render() {
+  const filtered = getFiltered();
+  // Stats
+  const catCounts = {};
+  filtered.forEach(a=>{ const c=categorize(a.profil); catCounts[c]=(catCounts[c]||0)+1; });
+  const total=filtered.length;
+  const totalJours=filtered.reduce((s,a)=>s+a.nbJours,0);
+  const avgJours=total?Math.round(totalJours/total):0;
+  const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
+
+  let statsHtml = `
+    <div class="stat-card"><div class="stat-val green">${total}</div><div class="stat-label">AO actifs</div></div>
+    <div class="stat-card"><div class="stat-val">${totalJours}</div><div class="stat-label">Jours cumulés</div></div>
+    <div class="stat-card"><div class="stat-val">${avgJours}j</div><div class="stat-label">Durée moy.</div></div>`;
+  if(urgent>0) statsHtml += `<div class="stat-card"><div class="stat-val red">${urgent}</div><div class="stat-label" style="color:#dc2626">Urgent</div></div>`;
+  for(const [cat,n] of Object.entries(catCounts)) {
+    const active = state.catFilter===cat ? " active" : "";
+    statsHtml += `<div class="stat-card clickable${active}" onclick="toggleCat('${cat}')"><div><span class="stat-dot" style="background:${CAT_COLORS[cat]}"></span><span class="stat-val" style="font-size:20px">${n}</span></div><div class="stat-label">${cat}</div></div>`;
+  }
+  document.getElementById("stats").innerHTML = statsHtml;
+
+  // Sort icons
+  document.querySelectorAll("th.sortable").forEach(th=>{
+    const col=th.dataset.col;
+    th.querySelector(".sort-icon").textContent = state.sortBy===col ? (state.sortDir===1?"↑":"↓") : "↕";
+  });
+
+  // Table
+  let html = "";
+  filtered.forEach(a=>{
+    const cat=categorize(a.profil);
+    const u=urgency(a.dateDebut);
+    const sel=state.selected&&state.selected.rfc===a.rfc&&state.selected.tm===a.tm;
+    html += `<tr class="row urg${u}${sel?" selected":""}" data-rfc="${a.rfc}" data-tm="${a.tm}">
+      <td class="rfc-code">${a.rfc.replace("RFC000","")}</td>
+      <td><span class="cat-badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
+      <td class="profil-cell" title="${a.profil}">${a.profil}</td>
+      <td class="org-cell" title="${a.org}">${shortOrg(a.org)}</td>
+      <td class="date-cell">${a.dateDebut}</td>
+      <td class="date-cell fin-cell">${a.dateFin}</td>
+      <td class="jours-cell">${a.nbJours}</td>
+    </tr>`;
+  });
+  document.getElementById("tbody").innerHTML = html;
+
+  // Row clicks
+  document.querySelectorAll("tr.row").forEach(tr=>{
+    tr.addEventListener("click", ()=>{
+      const rfc=tr.dataset.rfc, tm=tr.dataset.tm;
+      if(state.selected&&state.selected.rfc===rfc&&state.selected.tm===tm) { state.selected=null; }
+      else { state.selected=filtered.find(a=>a.rfc===rfc&&a.tm===tm)||null; }
+      render();
+    });
+  });
+
+  // Detail
+  const det=document.getElementById("detail");
+  if(state.selected) {
+    const s=state.selected;
+    det.style.display="block";
+    det.innerHTML = `<div class="detail">
+      <div class="detail-header">
+        <div>
+          <div class="detail-codes">${s.rfc} · ${s.tm}</div>
+          <h3>${s.profil}</h3>
+        </div>
+        <button class="detail-close" onclick="state.selected=null;render();">✕</button>
+      </div>
+      <div class="detail-grid">
+        <div><div class="label">Intitulé</div>${s.intitule}</div>
+        <div><div class="label">Organisation</div>${s.org}</div>
+        <div><div class="label">Département</div>${s.dept}</div>
+        <div><div class="label">Modalité</div>${s.modalite}</div>
+        <div><div class="label">Période</div>${s.dateDebut} → ${s.dateFin}</div>
+        <div><div class="label">Durée</div><strong>${s.nbJours} jours</strong></div>
+        <div><div class="label">Statut</div>${s.statut}</div>
+      </div>
+    </div>`;
+  } else { det.style.display="none"; }
+}
+
+// Filters setup
+function setupFilters() {
+  const depts = ["Tous", ...new Set(aos.map(a=>a.dept))];
+  const cats = ["Tous", ...new Set(aos.map(a=>categorize(a.profil)))];
+  const deptSel = document.getElementById("deptFilter");
+  const catSel = document.getElementById("catFilter");
+  deptSel.innerHTML = depts.map(d=>`<option value="${d}">${d==="Tous"?"Tous départements":d}</option>`).join("");
+  catSel.innerHTML = cats.map(c=>`<option value="${c}">${c==="Tous"?"Toutes catégories":c}</option>`).join("");
+}
+
+// Events
+document.getElementById("search").addEventListener("input", e=>{ state.search=e.target.value; render(); });
+document.getElementById("deptFilter").addEventListener("change", e=>{ state.deptFilter=e.target.value; render(); });
+document.getElementById("catFilter").addEventListener("change", e=>{ state.catFilter=e.target.value; render(); });
+document.querySelectorAll("th.sortable").forEach(th=>{
+  th.addEventListener("click", ()=>{
+    const col=th.dataset.col;
+    if(state.sortBy===col) state.sortDir=-state.sortDir;
+    else { state.sortBy=col; state.sortDir=1; }
+    render();
+  });
+});
+function toggleCat(cat) { state.catFilter = state.catFilter===cat ? "Tous" : cat; document.getElementById("catFilter").value=state.catFilter; render(); }
+
+// Init
+document.getElementById("updateDate").textContent = new Date().toLocaleDateString("fr-FR");
+setupFilters();
+render();
+</script>
+</body>
+</html>
