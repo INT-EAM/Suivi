@@ -322,7 +322,7 @@ function getFilteredAOs() {
 function navigate(view) {
   currentView = view;
   selectedRFC = null;
-  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null};
+  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null,suivi:null};
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
   renderView();
 }
@@ -343,7 +343,7 @@ async function renderView() {
 
 // ===================== DASHBOARD =====================
 // Dashboard filter state
-let dashF = { dept:null, domain:null, bm:null, cat:null };
+let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null };
 
 function dashFilteredAOs() {
   let f = getOpenAOs();
@@ -351,10 +351,16 @@ function dashFilteredAOs() {
   if(dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
   if(dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
   if(dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
+  if(dashF.suivi) {
+    if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
+    else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse);
+    else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif);
+    else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
+  }
   return f;
 }
 
-function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat; }
+function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat||dashF.suivi; }
 
 function renderDashboard(el) {
   const all = getOpenAOs();
@@ -373,6 +379,12 @@ function renderDashboard(el) {
     if(exclude!=="domain" && dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
     if(exclude!=="bm" && dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
     if(exclude!=="cat" && dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
+    if(exclude!=="suivi" && dashF.suivi) {
+      if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
+      else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse);
+      else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif);
+      else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
+    }
     return f;
   }
 
@@ -405,13 +417,14 @@ function renderDashboard(el) {
   const fRepondu=filtered.filter(a=>a.dateReponse).length;
   const fQualif=filtered.filter(a=>a.dateQualif).length;
   const fDem=filtered.filter(a=>a.dateDemarrage).length;
-  const fSteps=[{label:"Ouverts",n:total,color:"var(--blue)"},{label:"Répondus",n:fRepondu,color:"var(--amber)"},{label:"Qualifiés",n:fQualif,color:"var(--purple)"},{label:"Démarrés",n:fDem,color:"var(--green)"}];
+  const fSteps=[{label:"Ouverts",n:total,color:"var(--blue)",key:"ouvert"},{label:"Répondus",n:fRepondu,color:"var(--amber)",key:"repondu"},{label:"Qualifiés",n:fQualif,color:"var(--purple)",key:"qualif"},{label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage"}];
   const fMax=Math.max(total,1);
   let funnelHtml='<div style="display:flex;flex-direction:column;gap:4px">';
   fSteps.forEach((s,i)=>{
     const pct=total?Math.round(s.n/fMax*100):0;
     const rate=i>0&&fSteps[i-1].n?Math.round(s.n/fSteps[i-1].n*100):null;
-    funnelHtml+='<div style="display:flex;align-items:center;gap:8px">';
+    const sel=dashF.suivi===s.key;
+    funnelHtml+='<div class="bar-row dash-click" data-key="suivi" data-val="'+s.key+'" style="cursor:pointer;'+(sel?"outline:2px solid '+s.color+';border-radius:6px;":"")+'">';
     funnelHtml+='<div style="width:70px;text-align:right;font-size:11px;color:var(--gray)">'+s.label+'</div>';
     funnelHtml+='<div style="flex:1;height:28px;background:var(--gray-light);border-radius:6px;overflow:hidden">';
     funnelHtml+='<div style="height:100%;width:'+pct+'%;background:'+s.color+';border-radius:6px;display:flex;align-items:center;padding-left:8px;min-width:32px">';
@@ -453,7 +466,8 @@ function renderDashboard(el) {
     mgrHtml+='</tr></thead><tbody>';
     mgrEntries.forEach(([bm,s])=>{
       const avg=s.delais.length?Math.round(s.delais.reduce((a,b)=>a+b,0)/s.delais.length):null;
-      mgrHtml+='<tr style="border-bottom:1px solid #f8fafc">';
+      const sel=dashF.bm===bm;
+      mgrHtml+='<tr class="dash-click" data-key="bm" data-val="'+bm+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;'+(sel?"background:#e0f2fe;":"")+'">';
       mgrHtml+='<td style="padding:5px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
       mgrHtml+='<td style="text-align:center;font-weight:700">'+s.total+'</td>';
       mgrHtml+='<td style="text-align:center;color:'+(s.ouvert>3?"var(--red)":"inherit")+'">'+s.ouvert+'</td>';
@@ -508,6 +522,7 @@ function renderDashboard(el) {
   if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
   if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
   if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
+  if(dashF.suivi) tags.push({k:"suivi",v:{ouvert:"Ouverts",repondu:"Répondus",qualif:"Qualifiés",demarrage:"Démarrés"}[dashF.suivi]||dashF.suivi});
 
   let tagsHtml='';
   if(tags.length){
@@ -564,7 +579,7 @@ function renderDashboard(el) {
   });
 
   const clearBtn=document.getElementById("dash-clear");
-  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null}; renderDashboard(document.getElementById("main-content")); });
+  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null}; renderDashboard(document.getElementById("main-content")); });
 
   const listBtn=document.getElementById("dash-to-list");
   if(listBtn) listBtn.addEventListener("click",()=>{
