@@ -16,6 +16,7 @@ a { color: var(--green); text-decoration: none; }
 
 /* Layout */
 .app { display: flex; min-height: 100vh; }
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .sidebar { width: 220px; background: #0f172a; color: #fff; padding: 20px 0; flex-shrink: 0; position: fixed; height: 100vh; overflow-y: auto; }
 .sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
 .sidebar-logo h2 { font-size: 18px; font-weight: 700; }
@@ -118,17 +119,53 @@ td.r { text-align: right; }
 .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width 0.3s; }
 .bar-val { width: 30px; font-weight: 700; font-size: 12px; }
 
-/* Responsive */
+/* Mobile menu */
+.menu-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: #0f172a; color: #fff; border: none; border-radius: 8px; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; }
+.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; }
+
+/* Tablet */
 @media (max-width: 900px) {
-  .sidebar { display: none; }
-  .main { margin-left: 0; }
-  .info-grid { grid-template-columns: 1fr 1fr; }
+  .menu-toggle { display: flex; }
+  .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; z-index: 1000; }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .main { margin-left: 0; padding: 16px 14px; padding-top: 56px; max-width: 100%; }
+  .dash-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .kpi { padding: 10px 12px; }
+  .kpi-value { font-size: 22px; }
+  .kpi-label { font-size: 10px; }
+  .info-grid, .form-grid { grid-template-columns: 1fr 1fr; }
+  .filter-bar { gap: 6px; }
+  .filter-bar select { font-size: 12px; padding: 6px 8px; }
+  .bar-label { width: 90px; font-size: 11px; }
+  table { font-size: 11.5px; }
+  th, td { padding: 6px 6px; }
+  .profil-cell { max-width: 140px; }
+  .org-cell { max-width: 100px; }
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .kpi-value { font-size: 20px; }
+  .info-grid, .form-grid { grid-template-columns: 1fr; }
+  .filter-bar input[type=text] { min-width: 100%; }
+  .filter-bar select { flex: 1; min-width: calc(50% - 6px); }
+  .header h1 { font-size: 18px; }
+  .header-actions { display: none; }
+  .bar-label { width: 70px; }
+  .profil-cell { max-width: 110px; font-size: 11px; }
+  .org-cell { display: none; }
+  th:nth-child(4), td:nth-child(4) { display: none; }
 }
 </style>
 </head>
 <body>
+<button class="menu-toggle" id="menu-toggle">☰</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 <div class="app">
-  <nav class="sidebar">
+  <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">
       <h2>INTM</h2>
       <span>AO Manager</span>
@@ -546,11 +583,11 @@ function renderDashboard(el) {
     +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos").length+'</div><div class="kpi-label">Clos</div></div>'
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+    +'<div class="dash-grid">'
     +'<div class="card"><div class="card-title">🔄 Funnel de conversion</div>'+funnelHtml+'</div>'
     +'<div class="card"><div class="card-title">👥 Charge par manager</div>'+mgrHtml+'</div>'
     +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+    +'<div class="dash-grid">'
     +'<div class="card"><div class="card-title">📂 '+(dashF.dept?dashF.dept+' — Domaines':'Par département')+' <span style="font-size:11px;color:var(--text-light);font-weight:400">'+(dashF.dept?"cliquez un domaine ou ← retour":"cliquez pour filtrer")+'</span></div><div class="bar-chart" id="dept-chart">'+deptChartHtml+'</div></div>'
     +'<div class="card"><div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div class="bar-chart">'+bmChartHtml+'</div></div>'
     +'</div>'
@@ -1000,8 +1037,18 @@ async function init(){
   try {
     await openDB();
     await seedIfEmpty();
+
+    // Mobile menu
+    const menuBtn=document.getElementById("menu-toggle");
+    const sidebar=document.getElementById("sidebar");
+    const overlay=document.getElementById("sidebar-overlay");
+    function toggleMenu(){ sidebar.classList.toggle("open"); overlay.classList.toggle("open"); }
+    function closeMenu(){ sidebar.classList.remove("open"); overlay.classList.remove("open"); }
+    menuBtn.addEventListener("click", toggleMenu);
+    overlay.addEventListener("click", closeMenu);
+
     document.querySelectorAll(".nav-item").forEach(n=>{
-      n.addEventListener("click",()=>navigate(n.dataset.view));
+      n.addEventListener("click",()=>{ closeMenu(); navigate(n.dataset.view); });
     });
     await renderView();
   } catch(e) {
