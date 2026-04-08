@@ -389,139 +389,67 @@ function renderDashboard(el) {
   const catData=subFilter("cat");
   const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
 
-  // Build funnel HTML
-  const fRepondu=filtered.filter(a=>a.dateReponse).length;
-  const fQualif=filtered.filter(a=>a.dateQualif).length;
-  const fDem=filtered.filter(a=>a.dateDemarrage).length;
-  const fSteps=[{label:"Ouverts",n:total,color:"var(--blue)"},{label:"Répondus",n:fRepondu,color:"var(--amber)"},{label:"Qualifiés",n:fQualif,color:"var(--purple)"},{label:"Démarrés",n:fDem,color:"var(--green)"}];
-  const fMax=Math.max(total,1);
-  let funnelHtml='<div style="display:flex;flex-direction:column;gap:4px">';
-  fSteps.forEach((s,i)=>{
-    const pct=total?Math.round(s.n/fMax*100):0;
-    const rate=i>0&&fSteps[i-1].n?Math.round(s.n/fSteps[i-1].n*100):null;
-    funnelHtml+='<div style="display:flex;align-items:center;gap:8px">';
-    funnelHtml+='<div style="width:70px;text-align:right;font-size:11px;color:var(--gray)">'+s.label+'</div>';
-    funnelHtml+='<div style="flex:1;height:28px;background:var(--gray-light);border-radius:6px;overflow:hidden">';
-    funnelHtml+='<div style="height:100%;width:'+pct+'%;background:'+s.color+';border-radius:6px;display:flex;align-items:center;padding-left:8px;min-width:32px">';
-    funnelHtml+='<span style="font-size:12px;font-weight:700;color:#fff">'+s.n+'</span></div></div>';
-    if(rate!==null) funnelHtml+='<div style="width:42px;font-size:11px;font-weight:600;color:'+(rate>=30?"var(--green)":"var(--red)")+'">'+rate+'%</div>';
-    else funnelHtml+='<div style="width:42px"></div>';
-    funnelHtml+='</div>';
-  });
-  funnelHtml+='</div>';
-  if(total) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux global : <strong style="color:'+(fDem/total>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/total*100)+'%</strong> (ouvert → démarré)</div>';
+  // Active filter tags
+  const tags=[];
+  if(dashF.dept) tags.push({k:"dept",v:dashF.dept});
+  if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
+  if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
+  if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
 
-  // Build manager table HTML
-  const mgrData={};
-  filtered.forEach(a=>{
-    const bm=a.bm||"Non assigné";
-    if(!mgrData[bm]) mgrData[bm]={total:0,ouvert:0,repondu:0,qualif:0,demarrage:0,delais:[]};
-    mgrData[bm].total++;
-    if(statutSuivi(a)==="ouvert") mgrData[bm].ouvert++;
-    if(a.dateReponse) mgrData[bm].repondu++;
-    if(a.dateQualif) mgrData[bm].qualif++;
-    if(a.dateDemarrage) mgrData[bm].demarrage++;
-    if(a.datePrise&&a.dateReponse){
-      const d1=new Date(a.datePrise),d2=new Date(a.dateReponse);
-      if(!isNaN(d1)&&!isNaN(d2)) mgrData[bm].delais.push(Math.round((d2-d1)/86400000));
-    }
-  });
-  const mgrEntries=Object.entries(mgrData).sort((a,b)=>b[1].total-a[1].total);
-  let mgrHtml='';
-  if(!mgrEntries.length){ mgrHtml='<div style="color:var(--gray);font-size:13px">Aucun BM assigné</div>'; }
-  else {
-    mgrHtml='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
-    mgrHtml+='<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--gray)">BM</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Total AO">Total</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Non traités">⚪</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Répondus">📨</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Qualifiés">🟣</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Démarrés">🟢</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Délai moyen réponse">⏱️ moy.</th>';
-    mgrHtml+='</tr></thead><tbody>';
-    mgrEntries.forEach(([bm,s])=>{
-      const avg=s.delais.length?Math.round(s.delais.reduce((a,b)=>a+b,0)/s.delais.length):null;
-      mgrHtml+='<tr style="border-bottom:1px solid #f8fafc">';
-      mgrHtml+='<td style="padding:5px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
-      mgrHtml+='<td style="text-align:center;font-weight:700">'+s.total+'</td>';
-      mgrHtml+='<td style="text-align:center;color:'+(s.ouvert>3?"var(--red)":"inherit")+'">'+s.ouvert+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.repondu+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.qualif+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
-      mgrHtml+='<td style="text-align:center;font-size:11px;color:'+(avg&&avg>5?"var(--amber)":"var(--green)")+'">'+(avg!==null?avg+"j":"—")+'</td>';
-      mgrHtml+='</tr>';
-    });
-    mgrHtml+='</tbody></table>';
-  }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <h1 style="font-size:24px;font-weight:800">Dashboard</h1>
+      ${dashHasFilters()?`<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>`:""}
+    </div>
 
-  // Build dept/domain chart HTML
-  let deptChartHtml='';
-  if(dashF.dept){
-    domainEntries.forEach(([d,n])=>{
-      const sel=dashF.domain===d;
-      deptChartHtml+='<div class="bar-row dash-click" data-key="domain" data-val="'+d+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--purple);border-radius:6px;":"")+'">';
-      deptChartHtml+='<div class="bar-label" title="'+d+'">'+d+'</div>';
-      deptChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxDomain*100)+'%;background:'+(sel?"var(--green)":"var(--purple)")+'">'+n+'</div></div></div>';
-    });
-    deptChartHtml+='<div style="margin-top:8px"><button class="btn dash-tag" data-key="dept" style="font-size:11px;padding:3px 10px">← Tous les départements</button></div>';
-  } else {
-    deptEntries.forEach(([d,n])=>{
-      const sel=dashF.dept===d;
-      deptChartHtml+='<div class="bar-row dash-click" data-key="dept" data-val="'+d+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--green);border-radius:6px;":"")+'">';
-      deptChartHtml+='<div class="bar-label" title="'+d+'">'+d+'</div>';
-      deptChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxDept*100)+'%;background:var(--green)">'+n+'</div></div></div>';
-    });
-  }
+    ${tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${tags.map(t=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="dash-tag" data-key="${t.k}">${t.v} ✕</span>`).join("")}</div>`:""}
 
-  // Build BM chart HTML
-  let bmChartHtml='';
-  bmEntries.forEach(([bm,n])=>{
-    const sel=dashF.bm===bm;
-    bmChartHtml+='<div class="bar-row dash-click" data-key="bm" data-val="'+bm+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--blue);border-radius:6px;":"")+'">';
-    bmChartHtml+='<div class="bar-label">'+bm+'</div>';
-    bmChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxBM*100)+'%;background:'+(sel?"var(--green)":"var(--blue)")+'">'+n+'</div></div></div>';
-  });
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${total}</div><div class="kpi-label">AO filtrés</div>${!dashHasFilters()?"":`<div class="kpi-sub">sur ${all.length} total</div>`}</div>
+      <div class="kpi" style="cursor:pointer" data-kpi="nontraite"><div class="kpi-value" style="color:var(--red)">${nonTraite}</div><div class="kpi-label">Non traités</div><div class="kpi-sub">${urgent} urgent${urgent>1?"s":""}</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${encours}</div><div class="kpi-label">En cours</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--purple)">${qualif}</div><div class="kpi-label">Qualifiés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${demarrage}</div><div class="kpi-label">Démarrés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${allAOs.filter(a=>a.statut==="clos").length}</div><div class="kpi-label">Clos</div></div>
+    </div>
 
-  // Build cat badges HTML
-  let catHtml='';
-  Object.entries(byCat).forEach(([c,n])=>{
-    const sel=dashF.cat===c;
-    catHtml+='<span class="badge dash-click" data-key="cat" data-val="'+c+'" style="background:'+CAT_COLORS[c]+';font-size:12px;padding:6px 14px;cursor:pointer;'+(sel?"outline:2px solid #333;outline-offset:2px;":"")+'">'+c+': '+n+'</span> ';
-  });
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-title">📂 ${dashF.dept?dashF.dept+" — Domaines":"Par département"} <span style="font-size:11px;color:var(--text-light);font-weight:400">${dashF.dept?"cliquez un domaine ou ← retour":"cliquez pour filtrer"}</span></div>
+        <div class="bar-chart" id="dept-chart">
+          ${dashF.dept?
+            domainEntries.map(([d,n])=>`<div class="bar-row dash-click" data-key="domain" data-val="${d}" style="cursor:pointer;${dashF.domain===d?"outline:2px solid var(--purple);border-radius:6px;":""}">
+              <div class="bar-label" title="${d}">${d}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDomain*100).toFixed(0)}%;background:${dashF.domain===d?"var(--green)":"var(--purple)"}">${n}</div></div>
+            </div>`).join("")
+            +`<div style="margin-top:8px"><button class="btn dash-tag" data-key="dept" style="font-size:11px;padding:3px 10px">← Tous les départements</button></div>`
+          :
+            deptEntries.map(([d,n])=>`<div class="bar-row dash-click" data-key="dept" data-val="${d}" style="cursor:pointer;${dashF.dept===d?"outline:2px solid var(--green);border-radius:6px;":""}">
+              <div class="bar-label" title="${d}">${d}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDept*100).toFixed(0)}%;background:var(--green)">${n}</div></div>
+            </div>`).join("")
+          }
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>
+        <div class="bar-chart">${bmEntries.map(([bm,n])=>`
+          <div class="bar-row dash-click" data-key="bm" data-val="${bm}" style="cursor:pointer;${dashF.bm===bm?"outline:2px solid var(--blue);border-radius:6px;":""}">
+            <div class="bar-label">${bm}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxBM*100).toFixed(0)}%;background:${dashF.bm===bm?"var(--green)":"var(--blue)"}">${n}</div></div>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
 
-  // Tags HTML
-  let tagsHtml='';
-  if(tags.length){
-    tagsHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
-    tags.forEach(t=>{
-      tagsHtml+='<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="dash-tag" data-key="'+t.k+'">'+t.v+' ✕</span>';
-    });
-    tagsHtml+='</div>';
-  }
+    <div class="card" style="margin-top:0">
+      <div class="card-title">🎯 Par type de profil <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${Object.entries(byCat).map(([c,n])=>`<span class="badge dash-click" data-key="cat" data-val="${c}" style="background:${CAT_COLORS[c]};font-size:12px;padding:6px 14px;cursor:pointer;${dashF.cat===c?"outline:2px solid #333;outline-offset:2px;":""}">${c}: ${n}</span>`).join("")}
+      </div>
+    </div>
 
-  el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-    +'<h1 style="font-size:24px;font-weight:800">Dashboard</h1>'
-    +(dashHasFilters()?'<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>':"")
-    +'</div>'
-    +tagsHtml
-    +'<div class="kpi-grid">'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+total+'</div><div class="kpi-label">AO filtrés</div>'+(dashHasFilters()?'<div class="kpi-sub">sur '+all.length+' total</div>':"")+'</div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--red)">'+nonTraite+'</div><div class="kpi-label">Non traités</div><div class="kpi-sub">'+urgent+' urgent'+(urgent>1?"s":"")+'</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--amber)">'+encours+'</div><div class="kpi-label">En cours</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--purple)">'+qualif+'</div><div class="kpi-label">Qualifiés</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos").length+'</div><div class="kpi-label">Clos</div></div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-    +'<div class="card"><div class="card-title">🔄 Funnel de conversion</div>'+funnelHtml+'</div>'
-    +'<div class="card"><div class="card-title">👥 Charge par manager</div>'+mgrHtml+'</div>'
-    +'</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
-    +'<div class="card"><div class="card-title">📂 '+(dashF.dept?dashF.dept+' — Domaines':'Par département')+' <span style="font-size:11px;color:var(--text-light);font-weight:400">'+(dashF.dept?"cliquez un domaine ou ← retour":"cliquez pour filtrer")+'</span></div><div class="bar-chart" id="dept-chart">'+deptChartHtml+'</div></div>'
-    +'<div class="card"><div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div class="bar-chart">'+bmChartHtml+'</div></div>'
-    +'</div>'
-    +'<div class="card" style="margin-top:0"><div class="card-title">🎯 Par type de profil <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+catHtml+'</div></div>'
-    +(dashHasFilters()?'<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des '+total+' AO filtrés</button></div>':"");
+    ${dashHasFilters()?`<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des ${total} AO filtrés</button></div>`:""}
   `;
 
   // Bind events
@@ -581,7 +509,7 @@ function renderListe(el) {
       <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
-      <td>${statutPill(ss)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
+      <td>${statutPill(ss)}</td>
     </tr>`;
   }).join("");
 
@@ -679,9 +607,6 @@ function renderDetail(el, rfc) {
           </div>
           <div class="field" id="dem-date-field" style="${ao.dateDemarrage?"":"display:none"}"><label>Date démarrage</label><input type="date" id="d_dateDemarrage" value="${ao.dateDemarrage||""}"></div>
         </div>
-        <div style="margin-top:12px">
-          <div class="field"><label>📝 Notes / Commentaires</label><textarea id="d_notes" style="width:100%;height:70px;border:1px solid #d1d5db;border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none" placeholder="Ex: en attente retour client, profil envoyé le...">${ao.notes||""}</textarea></div>
-        </div>
         <div class="form-actions">
           <button class="btn btn-green" id="save-detail">💾 Enregistrer</button>
           <button class="btn btn-red" id="clear-detail">🗑️ Effacer le suivi</button>
@@ -706,14 +631,13 @@ function renderDetail(el, rfc) {
     ao.tjm = document.getElementById("d_tjm").value;
     ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
     ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
-    ao.notes = document.getElementById("d_notes").value.trim();
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
     await dbPut("aos", ao);
     renderView();
   });
   document.getElementById("clear-detail").addEventListener("click",async()=>{
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
-    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";
+    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";
     await dbPut("aos", ao);
     renderView();
   });
@@ -767,14 +691,14 @@ function renderImport(el) {
     parsed.forEach(p=>{
       const ex = existingMap[p.rfc];
       if(!ex){
-        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateCreation:today(), dateCloture:"", dernierImport:today()});
+        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", dateCreation:today(), dateCloture:"", dernierImport:today()});
         added++;
       } else {
         // Update PWise fields, keep tracking
         let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
         const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dernierImport:today(),
           bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
-          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateCreation:ex.dateCreation||today()};
+          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", dateCreation:ex.dateCreation||today()};
         toSave.push(merged);
         if(changed) updated++; else unchanged++;
       }
@@ -827,102 +751,14 @@ function renderExport(el) {
         <label class="btn" style="cursor:pointer">📎 Restaurer JSON <input type="file" accept=".json" style="display:none" onchange="doImportJSON(event)"></label>
       </div>
     </div>
-    <div class="card">
-      <div class="card-title">📧 Rapport hebdomadaire</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Génère un résumé prêt à copier-coller dans un mail ou Teams pour le point d'équipe.</p>
-      <button class="btn btn-green" id="gen-report">📋 Générer le rapport</button>
-      <div id="report-area"></div>
-    </div>
   `;
-  document.getElementById("gen-report").addEventListener("click",()=>{
-    const open=getOpenAOs();
-    const now=new Date();
-    const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
-
-    // Stats
-    const total=open.length;
-    const nonTraite=open.filter(a=>statutSuivi(a)==="ouvert").length;
-    const reponduSemaine=open.filter(a=>a.dateReponse&&new Date(a.dateReponse)>=weekAgo).length;
-    const qualifSemaine=open.filter(a=>a.dateQualif&&new Date(a.dateQualif)>=weekAgo).length;
-    const demSemaine=open.filter(a=>a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo).length;
-    const totalRepondu=open.filter(a=>a.dateReponse).length;
-    const totalQualif=open.filter(a=>a.dateQualif).length;
-    const totalDem=open.filter(a=>a.dateDemarrage).length;
-
-    // Par BM
-    const bms={};
-    open.forEach(a=>{
-      const bm=a.bm;if(!bm)return;
-      if(!bms[bm])bms[bm]={total:0,reponduSem:0,qualifSem:0,demSem:0,nonTraite:0};
-      bms[bm].total++;
-      if(statutSuivi(a)==="ouvert") bms[bm].nonTraite++;
-      if(a.dateReponse&&new Date(a.dateReponse)>=weekAgo) bms[bm].reponduSem++;
-      if(a.dateQualif&&new Date(a.dateQualif)>=weekAgo) bms[bm].qualifSem++;
-      if(a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo) bms[bm].demSem++;
-    });
-
-    // AO urgents
-    const urgents=open.filter(a=>urgency(a.dateDebut)>=2&&statutSuivi(a)==="ouvert");
-
-    // AO avec notes récentes
-    const avecNotes=open.filter(a=>a.notes).slice(0,5);
-
-    const dateStr=now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-
-    let report=`📊 RAPPORT HEBDO AO BCEF — ${dateStr}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📈 VUE D'ENSEMBLE
-• ${total} AO ouverts dont ${nonTraite} non traités
-• Funnel : ${total} ouverts → ${totalRepondu} répondus → ${totalQualif} qualifiés → ${totalDem} démarrés
-• Taux conversion global : ${total?Math.round(totalDem/total*100):0}%
-
-📅 ACTIVITÉ DE LA SEMAINE
-• ${reponduSemaine} réponse(s) envoyée(s)
-• ${qualifSemaine} qualification(s) obtenue(s)
-• ${demSemaine} démarrage(s)`;
-
-    if(Object.keys(bms).length){
-      report+=`\n\n👤 PAR MANAGER`;
-      Object.entries(bms).sort((a,b)=>b[1].total-a[1].total).forEach(([bm,s])=>{
-        report+=`\n• ${bm} : ${s.total} AO (${s.nonTraite} à traiter)`;
-        const acts=[];
-        if(s.reponduSem) acts.push(s.reponduSem+" rép.");
-        if(s.qualifSem) acts.push(s.qualifSem+" qualif");
-        if(s.demSem) acts.push(s.demSem+" dém.");
-        if(acts.length) report+=` — semaine : ${acts.join(", ")}`;
-      });
-    }
-
-    if(urgents.length){
-      report+=`\n\n🚨 AO URGENTS (non traités, début imminent)`;
-      urgents.slice(0,8).forEach(a=>{
-        report+=`\n• ${a.rfc} — ${a.profil.substring(0,50)} — début ${a.dateDebut}`;
-      });
-    }
-
-    if(avecNotes.length){
-      report+=`\n\n📝 NOTES RÉCENTES`;
-      avecNotes.forEach(a=>{
-        report+=`\n• ${a.rfc} (${a.bm||"?"}) : ${a.notes.substring(0,80)}`;
-      });
-    }
-
-    report+=`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nGénéré depuis INTM AO Manager`;
-
-    document.getElementById("report-area").innerHTML=`
-      <div style="margin-top:14px;background:#0f172a;border-radius:10px;padding:16px;position:relative">
-        <button class="btn" style="position:absolute;top:10px;right:10px;font-size:11px;padding:4px 10px" onclick="navigator.clipboard.writeText(document.getElementById('report-text').textContent);this.textContent='✅ Copié !';setTimeout(()=>this.textContent='📋 Copier',1500)">📋 Copier</button>
-        <pre id="report-text" style="color:#e2e8f0;font-size:12.5px;font-family:'Cascadia Code','Fira Code',monospace;white-space:pre-wrap;line-height:1.6;margin:0">${report}</pre>
-      </div>`;
-  });
 }
 
 function doExportCSV(){
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
+  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Statut suivi;Statut AO\n";
   allAOs.forEach(a=>{
     const ss=a.statut==="clos"?"clos":statutSuivi(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${statutLabel(ss)};${a.statut}\n`;
   });
   download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
 }
@@ -957,7 +793,7 @@ async function seedIfEmpty(){
   const existing = await dbGetAll("aos");
   if(existing.length > 0) return;
   const parsed = parseAOs(SEED);
-  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateCreation:today(), dateCloture:"", dernierImport:today()}));
+  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", dateCreation:today(), dateCloture:"", dernierImport:today()}));
   await dbPutMany("aos", toSave);
   await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
   console.log("Seed: "+parsed.length+" AO importés");
