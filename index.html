@@ -250,6 +250,7 @@ function toISO(d){if(!d)return"";const dt=parseDate(d);if(!dt||isNaN(dt))return"
 function fromISO(s){if(!s)return"";const[y,m,d]=s.split("-");return`${d}/${m}/${y}`;}
 function urgency(d){const dt=parseDate(d);if(!dt)return 0;const diff=(dt-new Date())/86400000;if(diff<0)return 3;if(diff<=7)return 2;if(diff<=21)return 1;return 0;}
 function shortOrg(o){return(o||"").replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,28);}
+function domainGroup(o){const s=(o||"").replace(/^BCEF (IT|RETAIL) - /,"").trim();const m=s.match(/^([A-Z0-9]{2,})/);return m?m[1]:s.split(" ")[0]||"Autre";}
 
 function statutSuivi(ao) {
   if(ao.dateDemarrage) return "demarrage";
@@ -343,13 +344,12 @@ function renderDashboard(el) {
   const deptEntries = Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
   const maxDept = deptEntries.length ? deptEntries[0][1] : 1;
 
-  // Par domaine (org), groupé par dept
-  const byOrg = {}; open.forEach(a=>{const o=shortOrg(a.org)||"Autre";byOrg[o]=(byOrg[o]||0)+1;});
+  // Par domaine (org), groupé par dept puis par acronyme
   const orgByDept = {};
   open.forEach(a=>{
     if(!orgByDept[a.dept]) orgByDept[a.dept]={};
-    const o=shortOrg(a.org)||"Autre";
-    orgByDept[a.dept][o]=(orgByDept[a.dept][o]||0)+1;
+    const g=domainGroup(a.org);
+    orgByDept[a.dept][g]=(orgByDept[a.dept][g]||0)+1;
   });
 
   // Par manager
