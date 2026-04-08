@@ -314,6 +314,7 @@ function getFilteredAOs() {
 function navigate(view) {
   currentView = view;
   selectedRFC = null;
+  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null};
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
   renderView();
 }
@@ -329,46 +330,83 @@ async function renderView() {
 }
 
 // ===================== DASHBOARD =====================
+// Dashboard filter state
+let dashF = { dept:null, domain:null, bm:null, cat:null };
+
+function dashFilteredAOs() {
+  let f = getOpenAOs();
+  if(dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
+  if(dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
+  if(dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
+  if(dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
+  return f;
+}
+
+function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat; }
+
 function renderDashboard(el) {
-  const open = getOpenAOs();
-  const total = open.length;
-  const totalJours = open.reduce((s,a)=>s+a.nbJours,0);
-  const encours = open.filter(a=>["encours","repondu"].includes(statutSuivi(a))).length;
-  const qualif = open.filter(a=>statutSuivi(a)==="qualif").length;
-  const demarrage = open.filter(a=>statutSuivi(a)==="demarrage").length;
-  const nonTraite = open.filter(a=>statutSuivi(a)==="ouvert").length;
-  const urgent = open.filter(a=>urgency(a.dateDebut)>=2).length;
+  const all = getOpenAOs();
+  const filtered = dashFilteredAOs();
+  const total=filtered.length;
+  const encours=filtered.filter(a=>["encours","repondu"].includes(statutSuivi(a))).length;
+  const qualif=filtered.filter(a=>statutSuivi(a)==="qualif").length;
+  const demarrage=filtered.filter(a=>statutSuivi(a)==="demarrage").length;
+  const nonTraite=filtered.filter(a=>statutSuivi(a)==="ouvert").length;
+  const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
 
-  // Par département
-  const byDept = {}; open.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
-  const deptEntries = Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
-  const maxDept = deptEntries.length ? deptEntries[0][1] : 1;
+  // Compute data for each chart based on OTHER filters (exclude own dimension)
+  function subFilter(exclude) {
+    let f=all;
+    if(exclude!=="dept" && dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
+    if(exclude!=="domain" && dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
+    if(exclude!=="bm" && dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
+    if(exclude!=="cat" && dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
+    return f;
+  }
 
-  // Par domaine (org), groupé par dept puis par acronyme
-  const orgByDept = {};
-  open.forEach(a=>{
-    if(!orgByDept[a.dept]) orgByDept[a.dept]={};
-    const g=domainGroup(a.org);
-    orgByDept[a.dept][g]=(orgByDept[a.dept][g]||0)+1;
-  });
+  // Départements (+ domaines en drilldown)
+  const deptData = subFilter("dept");
+  const byDept={}; deptData.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
+  const deptEntries=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
+  const maxDept=deptEntries.length?deptEntries[0][1]:1;
 
-  // Par manager
-  const byBM = {}; open.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
-  const bmEntries = Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
-  const maxBM = bmEntries.length ? bmEntries[0][1] : 1;
+  // Domaines (si un dept est sélectionné)
+  let domainEntries=[], maxDomain=1;
+  if(dashF.dept) {
+    const domData=subFilter("domain").filter(a=>a.dept===dashF.dept);
+    const byDom={}; domData.forEach(a=>{const g=domainGroup(a.org);byDom[g]=(byDom[g]||0)+1;});
+    domainEntries=Object.entries(byDom).sort((a,b)=>b[1]-a[1]);
+    maxDomain=domainEntries.length?domainEntries[0][1]:1;
+  }
 
-  // Par catégorie
-  const byCat = {}; open.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
+  // Managers
+  const bmData=subFilter("bm");
+  const byBM={}; bmData.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
+  const bmEntries=Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
+  const maxBM=bmEntries.length?bmEntries[0][1]:1;
 
-  // Store for drilldown
-  window._dashOrg = orgByDept;
+  // Catégories
+  const catData=subFilter("cat");
+  const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
+
+  // Active filter tags
+  const tags=[];
+  if(dashF.dept) tags.push({k:"dept",v:dashF.dept});
+  if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
+  if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
+  if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
 
   el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Dashboard</h1>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <h1 style="font-size:24px;font-weight:800">Dashboard</h1>
+      ${dashHasFilters()?`<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>`:""}
+    </div>
+
+    ${tags.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${tags.map(t=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="dash-tag" data-key="${t.k}">${t.v} ✕</span>`).join("")}</div>`:""}
 
     <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${total}</div><div class="kpi-label">AO ouverts</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--red)">${nonTraite}</div><div class="kpi-label">Non traités</div><div class="kpi-sub">${urgent} urgent${urgent>1?"s":""}</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${total}</div><div class="kpi-label">AO filtrés</div>${!dashHasFilters()?"":`<div class="kpi-sub">sur ${all.length} total</div>`}</div>
+      <div class="kpi" style="cursor:pointer" data-kpi="nontraite"><div class="kpi-value" style="color:var(--red)">${nonTraite}</div><div class="kpi-label">Non traités</div><div class="kpi-sub">${urgent} urgent${urgent>1?"s":""}</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${encours}</div><div class="kpi-label">En cours</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--purple)">${qualif}</div><div class="kpi-label">Qualifiés</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--green)">${demarrage}</div><div class="kpi-label">Démarrés</div></div>
@@ -377,48 +415,75 @@ function renderDashboard(el) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
-        <div class="card-title" id="domain-chart-title">📂 Par département <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour voir les domaines</span></div>
-        <div class="bar-chart" id="domain-chart">${deptEntries.map(([d,n])=>`
-          <div class="bar-row dept-bar" data-dept="${d}" style="cursor:pointer">
-            <div class="bar-label" title="${d}">${d}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDept*100).toFixed(0)}%;background:var(--green)">${n}</div></div>
-          </div>`).join("")}
+        <div class="card-title">📂 ${dashF.dept?dashF.dept+" — Domaines":"Par département"} <span style="font-size:11px;color:var(--text-light);font-weight:400">${dashF.dept?"cliquez un domaine ou ← retour":"cliquez pour filtrer"}</span></div>
+        <div class="bar-chart" id="dept-chart">
+          ${dashF.dept?
+            domainEntries.map(([d,n])=>`<div class="bar-row dash-click" data-key="domain" data-val="${d}" style="cursor:pointer;${dashF.domain===d?"outline:2px solid var(--purple);border-radius:6px;":""}">
+              <div class="bar-label" title="${d}">${d}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDomain*100).toFixed(0)}%;background:${dashF.domain===d?"var(--green)":"var(--purple)"}">${n}</div></div>
+            </div>`).join("")
+            +`<div style="margin-top:8px"><button class="btn dash-tag" data-key="dept" style="font-size:11px;padding:3px 10px">← Tous les départements</button></div>`
+          :
+            deptEntries.map(([d,n])=>`<div class="bar-row dash-click" data-key="dept" data-val="${d}" style="cursor:pointer;${dashF.dept===d?"outline:2px solid var(--green);border-radius:6px;":""}">
+              <div class="bar-label" title="${d}">${d}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDept*100).toFixed(0)}%;background:var(--green)">${n}</div></div>
+            </div>`).join("")
+          }
         </div>
       </div>
       <div class="card">
-        <div class="card-title">👤 Par manager</div>
+        <div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>
         <div class="bar-chart">${bmEntries.map(([bm,n])=>`
-          <div class="bar-row">
+          <div class="bar-row dash-click" data-key="bm" data-val="${bm}" style="cursor:pointer;${dashF.bm===bm?"outline:2px solid var(--blue);border-radius:6px;":""}">
             <div class="bar-label">${bm}</div>
-            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxBM*100).toFixed(0)}%;background:var(--blue)">${n}</div></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxBM*100).toFixed(0)}%;background:${dashF.bm===bm?"var(--green)":"var(--blue)"}">${n}</div></div>
           </div>`).join("")}
         </div>
       </div>
     </div>
 
     <div class="card" style="margin-top:0">
-      <div class="card-title">🎯 Par type de profil</div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        ${Object.entries(byCat).map(([c,n])=>`<div style="display:flex;align-items:center;gap:8px"><span class="badge" style="background:${CAT_COLORS[c]};font-size:12px;padding:4px 12px">${c}: ${n}</span></div>`).join("")}
+      <div class="card-title">🎯 Par type de profil <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${Object.entries(byCat).map(([c,n])=>`<span class="badge dash-click" data-key="cat" data-val="${c}" style="background:${CAT_COLORS[c]};font-size:12px;padding:6px 14px;cursor:pointer;${dashF.cat===c?"outline:2px solid #333;outline-offset:2px;":""}">${c}: ${n}</span>`).join("")}
       </div>
     </div>
+
+    ${dashHasFilters()?`<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des ${total} AO filtrés</button></div>`:""}
   `;
 
-  // Drilldown: click dept → show domains
-  document.querySelectorAll(".dept-bar").forEach(row=>{
-    row.addEventListener("click",()=>{
-      const dept = row.dataset.dept;
-      const domains = window._dashOrg[dept]||{};
-      const entries = Object.entries(domains).sort((a,b)=>b[1]-a[1]);
-      const max = entries.length ? entries[0][1] : 1;
-      document.getElementById("domain-chart-title").innerHTML=`📂 ${dept} — Domaines <button id="back-to-dept" class="btn" style="margin-left:10px;padding:3px 10px;font-size:11px">← Retour</button>`;
-      document.getElementById("domain-chart").innerHTML=entries.map(([o,n])=>`
-        <div class="bar-row">
-          <div class="bar-label" title="${o}">${o}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:${(n/max*100).toFixed(0)}%;background:var(--purple)">${n}</div></div>
-        </div>`).join("");
-      document.getElementById("back-to-dept").addEventListener("click",()=>renderDashboard(el));
+  // Bind events
+  document.querySelectorAll(".dash-click").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const k=el.dataset.key, v=el.dataset.val;
+      if(dashF[k]===v) dashF[k]=null; // toggle off
+      else dashF[k]=v;
+      // If changing dept, reset domain
+      if(k==="dept") dashF.domain=null;
+      renderDashboard(document.getElementById("main-content"));
     });
+  });
+
+  document.querySelectorAll(".dash-tag").forEach(el=>{
+    el.addEventListener("click",()=>{
+      const k=el.dataset.key;
+      dashF[k]=null;
+      if(k==="dept") dashF.domain=null;
+      renderDashboard(document.getElementById("main-content"));
+    });
+  });
+
+  const clearBtn=document.getElementById("dash-clear");
+  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null}; renderDashboard(document.getElementById("main-content")); });
+
+  const listBtn=document.getElementById("dash-to-list");
+  if(listBtn) listBtn.addEventListener("click",()=>{
+    // Transfer dash filters to list filters
+    filters.dept=dashF.dept||"Tous";
+    filters.cat=dashF.cat||"Tous";
+    filters.bm=dashF.bm||"Tous";
+    if(dashF.domain) filters.search=dashF.domain;
+    navigate("liste");
   });
 }
 
