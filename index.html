@@ -3,550 +3,718 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AO BCEF — PWise Viewer</title>
+<title>INTM — AO Manager</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f5f7fa; color: #1a1a2e; }
-  .wrap { max-width: 1260px; margin: 0 auto; padding: 20px; }
+:root {
+  --green: #00915a; --green-dark: #00643e; --blue: #3b82f6; --purple: #8b5cf6;
+  --amber: #f59e0b; --red: #ef4444; --gray: #64748b; --gray-light: #f1f5f9;
+  --bg: #f5f7fa; --card: #fff; --border: #e2e8f0; --text: #1a1a2e; --text-light: #94a3b8;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+a { color: var(--green); text-decoration: none; }
 
-  /* Header */
-  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
-  .header-bar { width: 6px; height: 40px; background: linear-gradient(180deg, #00915a, #00643e); border-radius: 3px; }
-  .header h1 { font-size: 23px; font-weight: 700; letter-spacing: -0.5px; }
-  .header p { font-size: 13px; color: #666; margin-top: 2px; }
+/* Layout */
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: #0f172a; color: #fff; padding: 20px 0; flex-shrink: 0; position: fixed; height: 100vh; overflow-y: auto; }
+.sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
+.sidebar-logo h2 { font-size: 18px; font-weight: 700; }
+.sidebar-logo span { font-size: 11px; color: var(--text-light); }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 13.5px; cursor: pointer; transition: background 0.12s; color: rgba(255,255,255,0.7); }
+.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.nav-item.active { background: rgba(0,145,90,0.2); color: #fff; border-left: 3px solid var(--green); }
+.nav-item .icon { font-size: 16px; width: 22px; text-align: center; }
+.nav-badge { margin-left: auto; background: var(--green); color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
+.main { margin-left: 220px; flex: 1; padding: 24px 28px; max-width: 1200px; }
 
-  /* Stats */
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
-  .stat-card { background: #fff; border-radius: 10px; padding: 12px 16px; border: 1px solid #e2e8f0; }
-  .stat-card.clickable { cursor: pointer; transition: box-shadow 0.15s; }
-  .stat-card.clickable:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-  .stat-card.clickable.active { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
-  .stat-val { font-size: 28px; font-weight: 700; }
-  .stat-label { font-size: 12px; color: #64748b; margin-top: 2px; }
-  .stat-val.green { color: #00915a; }
-  .stat-val.red { color: #dc2626; }
-  .stat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+/* Cards */
+.card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: var(--gray); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
-  /* Filters */
-  .filters { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
-  .filters input, .filters select { padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; outline: none; background: #fff; }
-  .filters input { flex: 1; min-width: 200px; }
-  .filters input:focus { border-color: #00915a; }
+/* KPI Grid */
+.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.kpi { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 16px; }
+.kpi-value { font-size: 32px; font-weight: 800; line-height: 1.1; }
+.kpi-label { font-size: 12px; color: var(--gray); margin-top: 4px; }
+.kpi-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
 
-  /* Table */
-  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  thead tr { background: #f1f5f9; }
-  th { padding: 10px 12px; text-align: left; font-weight: 600; white-space: nowrap; user-select: none; }
-  th.sortable { cursor: pointer; }
-  th.sortable:hover { color: #00915a; }
-  td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
-  tr.row { cursor: pointer; transition: background 0.12s; }
-  tr.row:hover { background: #f8fafc !important; }
-  tr.row.selected { background: #e0f2fe !important; }
-  tr.urg3 { background: #fef2f2; }
-  tr.urg2 { background: #fefce8; }
-  tr.urg1 { background: #f0fdf4; }
-  .rfc-code { font-family: monospace; font-size: 12px; color: #475569; }
-  .cat-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
-  .profil-cell { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .org-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #64748b; }
-  .date-cell { white-space: nowrap; }
-  .fin-cell { color: #94a3b8; }
-  .jours-cell { text-align: right; font-weight: 600; }
-  th.jours-h { text-align: right; }
+/* Filters Bar */
+.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.filter-bar select, .filter-bar input { padding: 7px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; outline: none; background: #fff; }
+.filter-bar input[type=text] { flex: 1; min-width: 180px; }
+.filter-bar input:focus, .filter-bar select:focus { border-color: var(--green); }
 
-  /* Detail */
-  .detail { margin-top: 14px; background: #fff; border-radius: 10px; border: 1px solid #e2e8f0; padding: 16px; animation: slideIn 0.15s ease; }
-  @keyframes slideIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; }
-  .detail-codes { font-size: 11px; color: #94a3b8; font-family: monospace; }
-  .detail h3 { margin: 4px 0 10px; font-size: 16px; font-weight: 700; }
-  .detail-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #94a3b8; }
-  .detail-close:hover { color: #333; }
-  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; font-size: 13px; }
-  .detail-grid .label { color: #94a3b8; font-size: 12px; }
-  .detail-grid strong { font-weight: 600; }
+/* Table */
+.table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+thead tr { background: var(--gray-light); }
+th { padding: 9px 10px; text-align: left; font-weight: 600; white-space: nowrap; user-select: none; font-size: 11.5px; text-transform: uppercase; color: var(--gray); letter-spacing: 0.3px; }
+th.sortable { cursor: pointer; }
+th.sortable:hover { color: var(--green); }
+td { padding: 7px 10px; border-bottom: 1px solid #f8fafc; }
+tr.row { cursor: pointer; transition: background 0.1s; }
+tr.row:hover { background: #f8fafc !important; }
+tr.row.selected { background: #e0f2fe !important; }
+tr.urg3 { background: #fef2f2; }
+tr.urg2 { background: #fefce8; }
+tr.urg1 { background: #f0fdf4; }
+tr.clos { opacity: 0.45; }
+.rfc-code { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 11px; color: #475569; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; color: #fff; }
+.profil-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.org-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray); font-size: 11.5px; }
+.tri-cell { font-weight: 700; color: var(--green); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+.empty-cell { color: #d1d5db; }
+.status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
+.pill-ouvert { background: #dbeafe; color: #1d4ed8; }
+.pill-encours { background: #fef3c7; color: #92400e; }
+.pill-qualif { background: #ede9fe; color: #6d28d9; }
+.pill-demarrage { background: #d1fae5; color: #065f46; }
+.pill-clos { background: #f1f5f9; color: #94a3b8; }
+th.r { text-align: right; }
+td.r { text-align: right; }
 
-  /* Footer */
-  .footer { margin-top: 20px; text-align: center; font-size: 11px; color: #94a3b8; }
+/* Detail Panel */
+.detail-panel { margin-top: 16px; animation: slideIn 0.15s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.detail-codes { font-size: 11px; color: var(--text-light); font-family: monospace; }
+.detail-panel h3 { font-size: 15px; font-weight: 700; margin-top: 4px; }
+.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); }
+.close-btn:hover { color: #333; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 20px; font-size: 13px; margin-bottom: 16px; }
+.info-grid .lbl { font-size: 11px; color: var(--text-light); margin-bottom: 2px; }
+.form-section { padding-top: 16px; border-top: 1px solid var(--border); }
+.form-section h4 { font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 11px; color: var(--text-light); font-weight: 500; }
+.field input, .field select { padding: 7px 10px; border-radius: 7px; border: 1px solid #d1d5db; font-size: 13px; outline: none; font-family: inherit; }
+.field input:focus { border-color: var(--green); }
+.field input.tri { text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
+.form-actions { display: flex; gap: 8px; margin-top: 14px; }
+.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; font-size: 12.5px; cursor: pointer; font-weight: 500; font-family: inherit; }
+.btn:hover { background: #f8fafc; }
+.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-green:hover { background: var(--green-dark); }
+.btn-red { color: var(--red); border-color: #fecaca; }
+.btn-red:hover { background: #fef2f2; }
 
-  @media (max-width: 768px) {
-    .detail-grid { grid-template-columns: 1fr; }
-    .stats { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
-  }
+/* Import */
+.import-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.15s; }
+.import-zone:hover { border-color: var(--green); background: #f0fdf4; }
+.import-zone.active { border-color: var(--green); background: #d1fae5; }
+.import-zone h3 { font-size: 16px; margin-bottom: 6px; }
+.import-zone p { font-size: 13px; color: var(--gray); }
+.import-result { margin-top: 16px; padding: 16px; border-radius: 10px; font-size: 13px; }
+.import-ok { background: #d1fae5; border: 1px solid #86efac; color: #065f46; }
+.import-warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+
+/* Charts (simple bars) */
+.bar-chart { display: flex; flex-direction: column; gap: 6px; }
+.bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+.bar-label { width: 140px; text-align: right; color: var(--gray); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-track { flex: 1; height: 22px; background: var(--gray-light); border-radius: 6px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width 0.3s; }
+.bar-val { width: 30px; font-weight: 700; font-size: 12px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .info-grid { grid-template-columns: 1fr 1fr; }
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="header">
-    <div class="header-bar"></div>
-    <div>
-      <h1>Appels d'Offres BCEF</h1>
-      <p>PWise — Consultations en cours</p>
+<div class="app">
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <h2>INTM</h2>
+      <span>AO Manager</span>
     </div>
-  </div>
-  <div class="stats" id="stats"></div>
-  <div class="filters">
-    <input type="text" id="search" placeholder="🔍 Rechercher RFC, profil, domaine...">
-    <select id="deptFilter"><option value="Tous">Tous départements</option></select>
-    <select id="catFilter"><option value="Tous">Toutes catégories</option></select>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th class="sortable" data-col="rfc">RFC <span class="sort-icon">↕</span></th>
-          <th>Cat.</th>
-          <th>Profil</th>
-          <th>Domaine</th>
-          <th class="sortable" data-col="dateDebut">Début <span class="sort-icon">↕</span></th>
-          <th>Fin</th>
-          <th class="sortable jours-h" data-col="nbJours">Jours <span class="sort-icon">↕</span></th>
-        </tr>
-      </thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
-  <div id="detail" style="display:none"></div>
-  <div class="footer">INTM — PWise AO Viewer · Mis à jour le <span id="updateDate"></span></div>
+    <div class="nav-item active" data-view="dashboard"><span class="icon">📊</span> Dashboard <span class="nav-badge" id="nav-count">0</span></div>
+    <div class="nav-item" data-view="liste"><span class="icon">📋</span> Appels d'offres</div>
+    <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
+    <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
+  </nav>
+
+  <div class="main" id="main-content"></div>
 </div>
 
 <script>
-// ====== DONNÉES BRUTES — COLLEZ ICI L'EXPORT PWISE ======
-const RAW_DATA = `btnMasterDetail
-RFC00004114
-BCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))
-TM00004671
-L6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Project Manager Risques IT & Cyber Sécurité Niveau 2
-Sur Site
-13/04/2026 - 31/12/2026
-151,00
-btnMasterDetail
-RFC00004045
-BCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java
-TM00004676
-L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Analyste / Développeur Niveau 5
-Sur Site
-20/04/2026 - 31/12/2026
-147,00
-btnMasterDetail
-RFC00004038
-BCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java
-TM00004675
-L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Analyste / Développeur Niveau 5
-Sur Site
-20/04/2026 - 31/12/2026
-147,00
-btnMasterDetail
-RFC00003897
-BCEF IT MDEP Nantes Intégrateur squad Xpay Estreem
-TM00004484
-L6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Analyste / Développeur Niveau 5
-Sur Site
-04/05/2026 - 31/12/2026
-140,00
-btnMasterDetail
-RFC00003890
-BCEF IT - Business Analyst Socle Data DHV2 (CS)
-TM00004420
-L6_BCEF IT - 2DAI 2 DATA IA
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
-Sur Site
-04/05/2026 - 31/12/2026
-140,00
-btnMasterDetail
-RFC00003863
-BCEF IT - BA - Crédits Pro ER (MCS)
-TM00004311
-L6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4
-Sur Site
-04/05/2026 - 31/12/2026
-140,00
-btnMasterDetail
-RFC00003855
-BCEF IT-DIFA 2-MBE Tech Lead Socle MBE (CS)
-TM00004407
-L6_BCEF IT - DIFA 2 ASSETS DIGITAUX CORPORATE ET TRANSVERSAUX
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Expert Technique Niveau 1
-Sur Site
-15/04/2026 - 31/12/2026
-150,00
-btnMasterDetail
-RFC00003835
-BCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2
-TM00004167
-L6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Analyste / Développeur Niveau 4
-Sur Site
-27/04/2026 - 31/12/2026
-143,00
-btnMasterDetail
-RFC00003827
-BCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2
-TM00004150
-L6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chef de Projet Technique Niveau 3
-Sur Site
-20/04/2026 - 31/12/2026
-147,00
-btnMasterDetail
-RFC00003797
-BCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)
-TM00004273
-L6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
-Sur Site
-27/04/2026 - 31/12/2026
-143,00
-btnMasterDetail
-RFC00003728
-[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO
-TM00004424
-L6_BCEF RETAIL - ACQUISITIONS CLIENTS
-L4_BCEF RETAIL
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
-Sur Site
-27/04/2026 - 31/10/2026
-130,00
-btnMasterDetail
-RFC00003679
-BCEF IT - Assurance vie - Gestion de projet (MCS)
-TM00004330
-L6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chef de Projet Technique Niveau 4
-Sur Site
-27/04/2026 - 31/12/2026
-143,00
-btnMasterDetail
-RFC00003672
-BCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte
-TM00004274
-L6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2
-Sur Site
-03/06/2026 - 31/12/2026
-124,00
-btnMasterDetail
-RFC00003642
-BCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK
-TM00003799
-L6_BCEF RETAIL - ACQUISITIONS CLIENTS
-L4_BCEF RETAIL
-Réponse fournisseur en cours
-btnMasterDetail
-BCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA
-Sur Site
-13/04/2026 - 30/09/2026
-118,00
-btnMasterDetail
-RFC00003372
-BCEF IT - CBO - Analyse de Test - Contrat d'Offres (CLA)
-TM00003975
-L6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
-Sur Site
-30/03/2026 - 31/12/2026
-159,00
-btnMasterDetail
-RFC00003355
-Chargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)
-TM00003847
-L6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN
-L4_BCEF RETAIL
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2
-Sur Site
-06/04/2026 - 30/09/2026
-122,00
-btnMasterDetail
-RFC00003294
-BCEF IT - CP Senior Mise en oeuvre exigences DCC2 dans le Socle Crédit - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)
-TM00004067
-L6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chef de Projet IT Fonctionnel Niveau 4
-Sur Site
-01/04/2026 - 30/06/2026
-50,00
-btnMasterDetail
-RFC00003018
-BCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java
-TM00003880
-L6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Analyste / Développeur Niveau 5
-Sur Site
-06/04/2026 - 31/12/2026
-155,00
-btnMasterDetail
-RFC00002985
-BCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)
-TM00001894
-L6_BCEF IT - OSBA 4 EPARGNE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3
-Sur Site
-02/03/2026 - 31/12/2026
-175,00
-btnMasterDetail
-RFC00001175
-BCEF IT - OSBA4 - Epargne - BA - Reporting Transverses
-TM00001974
-L6_BCEF IT - OSBA 4 EPARGNE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4
-Sur Site
-20/04/2026 - 31/12/2026
-147,00
-btnMasterDetail
-RFC00000929
-BCEF IT Projet Gestion Sous Mandat (CLA)
-TM00001888
-L6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE
-L4_BCEF IT
-Réponse fournisseur en cours
-btnMasterDetail
-Chef de Projet IT Fonctionnel Niveau 4
-Sur Site
-16/03/2026 - 31/12/2026
-167,00`;
-// ====== FIN DES DONNÉES ======
+// ===================== INDEXEDDB =====================
+const DB_NAME = "intm_ao_manager";
+const DB_VERSION = 2;
+let db;
 
-// Parser
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains("aos")) {
+        const s = d.createObjectStore("aos", { keyPath: "rfc" });
+        s.createIndex("statut", "statut");
+        s.createIndex("dept", "dept");
+        s.createIndex("bm", "bm");
+        s.createIndex("dateCreation", "dateCreation");
+      }
+      if (!d.objectStoreNames.contains("imports")) {
+        d.createObjectStore("imports", { keyPath: "id", autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = e => reject(e);
+  });
+}
+
+function dbGetAll(store) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readonly");
+    const s = tx.objectStore(store);
+    const req = s.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbPut(store, data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    const s = tx.objectStore(store);
+    s.put(data);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function dbPutMany(store, items) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    const s = tx.objectStore(store);
+    items.forEach(item => s.put(item));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ===================== PARSER =====================
 function parseAOs(raw) {
   const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  const aos = [];
   const noise = ["Prestation","Dates de mission","Nombre d'UO","TJM","Code","Demande d'achats","Organisation","Département","Date limite de réponses","Statut"];
-  let i = 0;
+  const aos = []; let i = 0;
   while (i < lines.length) {
-    if (lines[i] === "btnMasterDetail" && i+1 < lines.length && /^RFC\d+/.test(lines[i+1])) {
-      const rfc = lines[i+1];
-      const intitule = lines[i+2] || "";
-      let tm="", org="", dept="", statut="";
-      let j = i+3;
-      while (j < lines.length && lines[j] !== "btnMasterDetail") {
-        if (/^TM\d+/.test(lines[j])) tm = lines[j];
-        else if (/^L6T?_/.test(lines[j])) org = lines[j].replace(/^L6T?_/, "");
-        else if (lines[j].startsWith("L4_")) dept = lines[j].replace("L4_", "");
-        else if (!noise.includes(lines[j]) && !lines[j].includes("Enregistrement") && !lines[j].includes("Modifier le paramétrage")) statut = lines[j];
+    if (lines[i]==="btnMasterDetail" && i+1<lines.length && /^RFC\d+/.test(lines[i+1])) {
+      const rfc=lines[i+1], intitule=lines[i+2]||"";
+      let tm="",org="",dept="",statutPwise="",j=i+3;
+      while(j<lines.length&&lines[j]!=="btnMasterDetail"){
+        if(/^TM\d+/.test(lines[j]))tm=lines[j];
+        else if(/^L6T?_/.test(lines[j]))org=lines[j].replace(/^L6T?_/,"");
+        else if(lines[j].startsWith("L4_"))dept=lines[j].replace("L4_","");
+        else if(!noise.includes(lines[j])&&!lines[j].includes("Enregistrement")&&!lines[j].includes("Modifier le paramétrage"))statutPwise=lines[j];
         j++;
       }
-      let profil="", modalite="", dateDebut="", dateFin="", nbJours=0;
-      if (j < lines.length && lines[j] === "btnMasterDetail") {
-        j++;
-        if (j < lines.length) { profil = lines[j]; j++; }
-        while (j < lines.length && lines[j] !== "btnMasterDetail") {
-          if (["Sur Site","Télétravail","Hybride"].includes(lines[j])) modalite = lines[j];
-          const dm = lines[j].match(/^(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})$/);
-          if (dm) { dateDebut = dm[1]; dateFin = dm[2]; }
-          const nm = lines[j].match(/^(\d+)[,.](\d+)$/);
-          if (nm) nbJours = parseInt(nm[1]);
+      let profil="",modalite="",dateDebut="",dateFin="",nbJours=0;
+      if(j<lines.length&&lines[j]==="btnMasterDetail"){
+        j++;if(j<lines.length){profil=lines[j];j++;}
+        while(j<lines.length&&lines[j]!=="btnMasterDetail"){
+          if(["Sur Site","Télétravail","Hybride"].includes(lines[j]))modalite=lines[j];
+          const dm=lines[j].match(/^(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})$/);
+          if(dm){dateDebut=dm[1];dateFin=dm[2];}
+          const nm=lines[j].match(/^(\d+)[,.](\d+)$/);
+          if(nm)nbJours=parseInt(nm[1]);
           j++;
         }
       }
-      if (rfc) aos.push({ rfc, intitule, tm, org, dept, statut, profil, modalite, dateDebut, dateFin, nbJours });
-      i = j;
-    } else { i++; }
+      if(rfc)aos.push({rfc,tm,intitule,org,dept,statutPwise,profil,modalite,dateDebut,dateFin,nbJours});
+      i=j;
+    } else i++;
   }
   return aos;
 }
 
+// ===================== HELPERS =====================
 function categorize(p) {
-  const l = p.toLowerCase();
-  if (/développeur|software|cobol|intégrateur/.test(l)) return "Dev";
-  if (/business analyst|chargé de mission|consultant fonctionnel|analyse de test/.test(l)) return "BA";
-  if (/chef de projet|project manager/.test(l)) return "CdP";
-  if (/expert technique|tech lead/.test(l)) return "Expert";
+  const l=(p||"").toLowerCase();
+  if(/développeur|software|cobol|intégrateur/.test(l)) return "Dev";
+  if(/business analyst|chargé de mission|consultant fonctionnel|analyse de test/.test(l)) return "BA";
+  if(/chef de projet|project manager/.test(l)) return "CdP";
+  if(/expert technique|tech lead/.test(l)) return "Expert";
   return "Autre";
 }
-const CAT_COLORS = { Dev:"#3b82f6", BA:"#8b5cf6", CdP:"#f59e0b", Expert:"#ef4444", Autre:"#6b7280" };
+const CAT_COLORS={Dev:"#3b82f6",BA:"#8b5cf6",CdP:"#f59e0b",Expert:"#ef4444",Autre:"#6b7280"};
 
-function parseDate(d) { if(!d) return null; const [day,month,year]=d.split("/"); return new Date(year,month-1,day); }
-function urgency(d) { const dt=parseDate(d); if(!dt) return 0; const diff=(dt-new Date())/(86400000); if(diff<0) return 3; if(diff<=7) return 2; if(diff<=21) return 1; return 0; }
-function shortOrg(o) { return o.replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,35); }
+function parseDate(d){if(!d)return null;const p=d.split("/");if(p.length===3)return new Date(p[2],p[1]-1,p[0]);return new Date(d);}
+function toISO(d){if(!d)return"";const dt=parseDate(d);if(!dt||isNaN(dt))return"";return dt.toISOString().slice(0,10);}
+function fromISO(s){if(!s)return"";const[y,m,d]=s.split("-");return`${d}/${m}/${y}`;}
+function urgency(d){const dt=parseDate(d);if(!dt)return 0;const diff=(dt-new Date())/86400000;if(diff<0)return 3;if(diff<=7)return 2;if(diff<=21)return 1;return 0;}
+function shortOrg(o){return(o||"").replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,28);}
 
-// State
-let aos = parseAOs(RAW_DATA);
-let state = { search:"", catFilter:"Tous", deptFilter:"Tous", sortBy:"dateDebut", sortDir:1, selected:null };
+function statutSuivi(ao) {
+  if(ao.dateDemarrage) return "demarrage";
+  if(ao.dateQualif) return "qualif";
+  if(ao.dateReponse) return "repondu";
+  if(ao.bm || ao.datePrise) return "encours";
+  return "ouvert";
+}
+function statutLabel(s) {
+  return {ouvert:"Ouvert",encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré",clos:"Clos"}[s]||s;
+}
+function statutPill(s) {
+  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-encours",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos"}[s]||"pill-ouvert";
+  return `<span class="status-pill ${cls}">${statutLabel(s)}</span>`;
+}
 
-function getFiltered() {
-  let f = aos;
-  if (state.search) { const s=state.search.toLowerCase(); f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept].some(v=>v.toLowerCase().includes(s))); }
-  if (state.catFilter!=="Tous") f=f.filter(a=>categorize(a.profil)===state.catFilter);
-  if (state.deptFilter!=="Tous") f=f.filter(a=>a.dept===state.deptFilter);
+function today(){return new Date().toISOString().slice(0,10);}
+
+function periodFilter(dateStr, period) {
+  if(!period||period==="all") return true;
+  const d = parseDate(dateStr);
+  if(!d) return true;
+  const now = new Date();
+  if(period==="week") { const w=new Date(now); w.setDate(w.getDate()-7); return d>=w; }
+  if(period==="month") { const m=new Date(now); m.setMonth(m.getMonth()-1); return d>=m; }
+  if(period==="quarter") { const q=new Date(now); q.setMonth(q.getMonth()-3); return d>=q; }
+  if(period==="year") { const y=new Date(now); y.setFullYear(y.getFullYear()-1); return d>=y; }
+  return true;
+}
+
+// ===================== STATE =====================
+let allAOs = [];
+let currentView = "dashboard";
+let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
+let sort = { col:"dateDebut", dir:1 };
+let selectedRFC = null;
+
+async function loadAOs() { allAOs = await dbGetAll("aos"); }
+
+function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
+function getFilteredAOs() {
+  let f = allAOs;
+  if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
+  else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
+  else f=f.filter(a=>a.statut!=="clos");
+  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||""].some(v=>(v||"").toLowerCase().includes(s)));}
+  if(filters.dept!=="Tous") f=f.filter(a=>a.dept===filters.dept);
+  if(filters.cat!=="Tous") f=f.filter(a=>categorize(a.profil)===filters.cat);
+  if(filters.bm!=="Tous") f=f.filter(a=>(a.bm||"")===(filters.bm==="—"?"":filters.bm));
+  if(filters.period!=="all") f=f.filter(a=>periodFilter(a.dateDebut,filters.period));
   f=[...f].sort((a,b)=>{
-    if(state.sortBy==="dateDebut") return state.sortDir*((parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0));
-    if(state.sortBy==="nbJours") return state.sortDir*(a.nbJours-b.nbJours);
-    return state.sortDir*a.rfc.localeCompare(b.rfc);
+    if(sort.col==="dateDebut") return sort.dir*((parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0));
+    if(sort.col==="nbJours") return sort.dir*(a.nbJours-b.nbJours);
+    if(sort.col==="rfc") return sort.dir*a.rfc.localeCompare(b.rfc);
+    return 0;
   });
   return f;
 }
 
-function render() {
-  const filtered = getFiltered();
-  // Stats
-  const catCounts = {};
-  filtered.forEach(a=>{ const c=categorize(a.profil); catCounts[c]=(catCounts[c]||0)+1; });
-  const total=filtered.length;
-  const totalJours=filtered.reduce((s,a)=>s+a.nbJours,0);
-  const avgJours=total?Math.round(totalJours/total):0;
-  const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
+// ===================== NAVIGATION =====================
+function navigate(view) {
+  currentView = view;
+  selectedRFC = null;
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
+  renderView();
+}
 
-  let statsHtml = `
-    <div class="stat-card"><div class="stat-val green">${total}</div><div class="stat-label">AO actifs</div></div>
-    <div class="stat-card"><div class="stat-val">${totalJours}</div><div class="stat-label">Jours cumulés</div></div>
-    <div class="stat-card"><div class="stat-val">${avgJours}j</div><div class="stat-label">Durée moy.</div></div>`;
-  if(urgent>0) statsHtml += `<div class="stat-card"><div class="stat-val red">${urgent}</div><div class="stat-label" style="color:#dc2626">Urgent</div></div>`;
-  for(const [cat,n] of Object.entries(catCounts)) {
-    const active = state.catFilter===cat ? " active" : "";
-    statsHtml += `<div class="stat-card clickable${active}" onclick="toggleCat('${cat}')"><div><span class="stat-dot" style="background:${CAT_COLORS[cat]}"></span><span class="stat-val" style="font-size:20px">${n}</span></div><div class="stat-label">${cat}</div></div>`;
-  }
-  document.getElementById("stats").innerHTML = statsHtml;
+async function renderView() {
+  await loadAOs();
+  document.getElementById("nav-count").textContent = getOpenAOs().length;
+  const main = document.getElementById("main-content");
+  if(currentView==="dashboard") renderDashboard(main);
+  else if(currentView==="liste") renderListe(main);
+  else if(currentView==="import") renderImport(main);
+  else if(currentView==="export") renderExport(main);
+}
 
-  // Sort icons
-  document.querySelectorAll("th.sortable").forEach(th=>{
-    const col=th.dataset.col;
-    th.querySelector(".sort-icon").textContent = state.sortBy===col ? (state.sortDir===1?"↑":"↓") : "↕";
-  });
+// ===================== DASHBOARD =====================
+function renderDashboard(el) {
+  const open = getOpenAOs();
+  const total = open.length;
+  const totalJours = open.reduce((s,a)=>s+a.nbJours,0);
+  const encours = open.filter(a=>["encours","repondu"].includes(statutSuivi(a))).length;
+  const qualif = open.filter(a=>statutSuivi(a)==="qualif").length;
+  const demarrage = open.filter(a=>statutSuivi(a)==="demarrage").length;
+  const nonTraite = open.filter(a=>statutSuivi(a)==="ouvert").length;
+  const urgent = open.filter(a=>urgency(a.dateDebut)>=2).length;
 
-  // Table
-  let html = "";
-  filtered.forEach(a=>{
-    const cat=categorize(a.profil);
-    const u=urgency(a.dateDebut);
-    const sel=state.selected&&state.selected.rfc===a.rfc&&state.selected.tm===a.tm;
-    html += `<tr class="row urg${u}${sel?" selected":""}" data-rfc="${a.rfc}" data-tm="${a.tm}">
-      <td class="rfc-code">${a.rfc.replace("RFC000","")}</td>
-      <td><span class="cat-badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
+  // Par domaine
+  const byDept = {}; open.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
+  const deptEntries = Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
+  const maxDept = deptEntries.length ? deptEntries[0][1] : 1;
+
+  // Par manager
+  const byBM = {}; open.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
+  const bmEntries = Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
+  const maxBM = bmEntries.length ? bmEntries[0][1] : 1;
+
+  // Par catégorie
+  const byCat = {}; open.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
+
+  el.innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Dashboard</h1>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${total}</div><div class="kpi-label">AO ouverts</div><div class="kpi-sub">${totalJours} jours cumulés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--red)">${nonTraite}</div><div class="kpi-label">Non traités</div><div class="kpi-sub">${urgent} urgent${urgent>1?"s":""}</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${encours}</div><div class="kpi-label">En cours</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--purple)">${qualif}</div><div class="kpi-label">Qualifiés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${demarrage}</div><div class="kpi-label">Démarrés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${allAOs.filter(a=>a.statut==="clos").length}</div><div class="kpi-label">Clos</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="card">
+        <div class="card-title">📂 Par département</div>
+        <div class="bar-chart">${deptEntries.map(([d,n])=>`
+          <div class="bar-row">
+            <div class="bar-label" title="${d}">${d}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDept*100).toFixed(0)}%;background:var(--green)">${n}</div></div>
+          </div>`).join("")}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">👤 Par manager</div>
+        <div class="bar-chart">${bmEntries.map(([bm,n])=>`
+          <div class="bar-row">
+            <div class="bar-label">${bm}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(n/maxBM*100).toFixed(0)}%;background:var(--blue)">${n}</div></div>
+          </div>`).join("")}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0">
+      <div class="card-title">🎯 Par type de profil</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        ${Object.entries(byCat).map(([c,n])=>`<div style="display:flex;align-items:center;gap:8px"><span class="badge" style="background:${CAT_COLORS[c]};font-size:12px;padding:4px 12px">${c}: ${n}</span></div>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ===================== LISTE AO =====================
+function renderListe(el) {
+  const open = getOpenAOs();
+  const depts = ["Tous",...new Set(allAOs.map(a=>a.dept))];
+  const cats = ["Tous",...new Set(allAOs.map(a=>categorize(a.profil)))];
+  const bms = ["Tous",...new Set(allAOs.map(a=>a.bm||"—").filter(Boolean))];
+
+  const filtered = getFilteredAOs();
+
+  let tableRows = filtered.map(a=>{
+    const cat=categorize(a.profil), u=urgency(a.dateDebut), ss=a.statut==="clos"?"clos":statutSuivi(a);
+    const sel=selectedRFC===a.rfc;
+    return `<tr class="row${u&&ss!=="clos"?" urg"+u:""}${ss==="clos"?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}">
+      <td class="rfc-code">${a.rfc.replace("RFC0000","").replace("RFC000","")}</td>
+      <td><span class="badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
       <td class="profil-cell" title="${a.profil}">${a.profil}</td>
       <td class="org-cell" title="${a.org}">${shortOrg(a.org)}</td>
-      <td class="date-cell">${a.dateDebut}</td>
-      <td class="date-cell fin-cell">${a.dateFin}</td>
-      <td class="jours-cell">${a.nbJours}</td>
+      <td>${a.dateDebut}</td>
+      <td class="r">${a.nbJours}</td>
+      <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
+      <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
+      <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
+      <td>${statutPill(ss)}</td>
     </tr>`;
-  });
-  document.getElementById("tbody").innerHTML = html;
+  }).join("");
 
-  // Row clicks
+  el.innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
+    <div class="filter-bar">
+      <input type="text" id="f_search" placeholder="🔍 Rechercher..." value="${filters.search}">
+      <select id="f_dept">${depts.map(d=>`<option value="${d}"${filters.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
+      <select id="f_cat">${cats.map(c=>`<option value="${c}"${filters.cat===c?" selected":""}>${c==="Tous"?"Catégorie":c}</option>`).join("")}</select>
+      <select id="f_statut">
+        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Statut suivi</option>
+        <option value="ouvert"${filters.statut==="ouvert"?" selected":""}>⚪ Ouvert</option>
+        <option value="encours"${filters.statut==="encours"?" selected":""}>🟡 En cours</option>
+        <option value="qualif"${filters.statut==="qualif"?" selected":""}>🟣 Qualifié</option>
+        <option value="demarrage"${filters.statut==="demarrage"?" selected":""}>🟢 Démarré</option>
+        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Clos</option>
+      </select>
+      <select id="f_bm">${bms.map(b=>`<option value="${b}"${filters.bm===b?" selected":""}>${b==="Tous"?"Manager":b}</option>`).join("")}</select>
+      <select id="f_period">
+        <option value="all"${filters.period==="all"?" selected":""}>Toute période</option>
+        <option value="week"${filters.period==="week"?" selected":""}>7 derniers jours</option>
+        <option value="month"${filters.period==="month"?" selected":""}>30 derniers jours</option>
+        <option value="quarter"${filters.period==="quarter"?" selected":""}>Trimestre</option>
+        <option value="year"${filters.period==="year"?" selected":""}>Année</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th class="sortable" data-col="rfc">RFC</th>
+          <th>Cat.</th><th>Profil</th><th>Domaine</th>
+          <th class="sortable" data-col="dateDebut">Début</th>
+          <th class="sortable r" data-col="nbJours">Jours</th>
+          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <div id="detail-area"></div>
+  `;
+
+  // Bind filters
+  document.getElementById("f_search").addEventListener("input",e=>{filters.search=e.target.value;renderListe(el);});
+  document.getElementById("f_dept").addEventListener("change",e=>{filters.dept=e.target.value;renderListe(el);});
+  document.getElementById("f_cat").addEventListener("change",e=>{filters.cat=e.target.value;renderListe(el);});
+  document.getElementById("f_statut").addEventListener("change",e=>{filters.statut=e.target.value;renderListe(el);});
+  document.getElementById("f_bm").addEventListener("change",e=>{filters.bm=e.target.value;renderListe(el);});
+  document.getElementById("f_period").addEventListener("change",e=>{filters.period=e.target.value;renderListe(el);});
+  document.querySelectorAll("th.sortable").forEach(th=>{
+    th.addEventListener("click",()=>{const c=th.dataset.col;if(sort.col===c)sort.dir=-sort.dir;else{sort.col=c;sort.dir=1;}renderListe(el);});
+  });
   document.querySelectorAll("tr.row").forEach(tr=>{
-    tr.addEventListener("click", ()=>{
-      const rfc=tr.dataset.rfc, tm=tr.dataset.tm;
-      if(state.selected&&state.selected.rfc===rfc&&state.selected.tm===tm) { state.selected=null; }
-      else { state.selected=filtered.find(a=>a.rfc===rfc&&a.tm===tm)||null; }
-      render();
+    tr.addEventListener("click",()=>{
+      const rfc=tr.dataset.rfc;
+      selectedRFC=selectedRFC===rfc?null:rfc;
+      renderListe(el);
+      if(selectedRFC) document.getElementById("detail-area").scrollIntoView({behavior:"smooth",block:"nearest"});
     });
   });
 
-  // Detail
-  const det=document.getElementById("detail");
-  if(state.selected) {
-    const s=state.selected;
-    det.style.display="block";
-    det.innerHTML = `<div class="detail">
+  if(selectedRFC) renderDetail(document.getElementById("detail-area"), selectedRFC);
+}
+
+function renderDetail(el, rfc) {
+  const ao = allAOs.find(a=>a.rfc===rfc);
+  if(!ao) return;
+  el.innerHTML = `
+    <div class="card detail-panel">
       <div class="detail-header">
-        <div>
-          <div class="detail-codes">${s.rfc} · ${s.tm}</div>
-          <h3>${s.profil}</h3>
+        <div><div class="detail-codes">${ao.rfc} · ${ao.tm}</div><h3>${ao.profil}</h3></div>
+        <button class="close-btn" id="close-detail">✕</button>
+      </div>
+      <div class="info-grid">
+        <div><div class="lbl">Intitulé</div>${ao.intitule}</div>
+        <div><div class="lbl">Organisation</div>${ao.org}</div>
+        <div><div class="lbl">Département</div>${ao.dept}</div>
+        <div><div class="lbl">Modalité</div>${ao.modalite||"—"}</div>
+        <div><div class="lbl">Période</div>${ao.dateDebut} → ${ao.dateFin}</div>
+        <div><div class="lbl">Durée</div><strong>${ao.nbJours} jours</strong></div>
+      </div>
+      <div class="form-section">
+        <h4>📋 Suivi INTM</h4>
+        <div class="form-grid">
+          <div class="field"><label>BM qui traite</label><input class="tri" id="d_bm" maxlength="4" placeholder="VBE" value="${ao.bm||""}"></div>
+          <div class="field"><label>Date prise en charge</label><input type="date" id="d_datePrise" value="${ao.datePrise||""}"></div>
+          <div class="field"><label>Date réponse</label><input type="date" id="d_dateReponse" value="${ao.dateReponse||""}"></div>
+          <div class="field"><label>Consultant poussé</label><input class="tri" id="d_consultant" maxlength="4" placeholder="FIB" value="${ao.consultant||""}"></div>
+          <div class="field"><label>TJM proposé (€)</label><input type="number" id="d_tjm" placeholder="450" value="${ao.tjm||""}"></div>
+          <div class="field"><label>Qualif obtenue</label>
+            <select id="d_qualif"><option value=""${!ao.dateQualif?" selected":""}>Non</option><option value="oui"${ao.dateQualif?" selected":""}>Oui</option></select>
+          </div>
+          <div class="field" id="qualif-date-field" style="${ao.dateQualif?"":"display:none"}"><label>Date qualif</label><input type="date" id="d_dateQualif" value="${ao.dateQualif||""}"></div>
+          <div class="field"><label>Démarrage</label>
+            <select id="d_demarrage"><option value=""${!ao.dateDemarrage?" selected":""}>Non</option><option value="oui"${ao.dateDemarrage?" selected":""}>Oui</option></select>
+          </div>
+          <div class="field" id="dem-date-field" style="${ao.dateDemarrage?"":"display:none"}"><label>Date démarrage</label><input type="date" id="d_dateDemarrage" value="${ao.dateDemarrage||""}"></div>
         </div>
-        <button class="detail-close" onclick="state.selected=null;render();">✕</button>
+        <div class="form-actions">
+          <button class="btn btn-green" id="save-detail">💾 Enregistrer</button>
+          <button class="btn btn-red" id="clear-detail">🗑️ Effacer le suivi</button>
+        </div>
       </div>
-      <div class="detail-grid">
-        <div><div class="label">Intitulé</div>${s.intitule}</div>
-        <div><div class="label">Organisation</div>${s.org}</div>
-        <div><div class="label">Département</div>${s.dept}</div>
-        <div><div class="label">Modalité</div>${s.modalite}</div>
-        <div><div class="label">Période</div>${s.dateDebut} → ${s.dateFin}</div>
-        <div><div class="label">Durée</div><strong>${s.nbJours} jours</strong></div>
-        <div><div class="label">Statut</div>${s.statut}</div>
-      </div>
-    </div>`;
-  } else { det.style.display="none"; }
-}
-
-// Filters setup
-function setupFilters() {
-  const depts = ["Tous", ...new Set(aos.map(a=>a.dept))];
-  const cats = ["Tous", ...new Set(aos.map(a=>categorize(a.profil)))];
-  const deptSel = document.getElementById("deptFilter");
-  const catSel = document.getElementById("catFilter");
-  deptSel.innerHTML = depts.map(d=>`<option value="${d}">${d==="Tous"?"Tous départements":d}</option>`).join("");
-  catSel.innerHTML = cats.map(c=>`<option value="${c}">${c==="Tous"?"Toutes catégories":c}</option>`).join("");
-}
-
-// Events
-document.getElementById("search").addEventListener("input", e=>{ state.search=e.target.value; render(); });
-document.getElementById("deptFilter").addEventListener("change", e=>{ state.deptFilter=e.target.value; render(); });
-document.getElementById("catFilter").addEventListener("change", e=>{ state.catFilter=e.target.value; render(); });
-document.querySelectorAll("th.sortable").forEach(th=>{
-  th.addEventListener("click", ()=>{
-    const col=th.dataset.col;
-    if(state.sortBy===col) state.sortDir=-state.sortDir;
-    else { state.sortBy=col; state.sortDir=1; }
-    render();
+    </div>
+  `;
+  document.getElementById("close-detail").addEventListener("click",()=>{selectedRFC=null;renderView();});
+  document.getElementById("d_qualif").addEventListener("change",e=>{
+    document.getElementById("qualif-date-field").style.display=e.target.value?"":"none";
+    if(e.target.value&&!document.getElementById("d_dateQualif").value) document.getElementById("d_dateQualif").value=today();
   });
-});
-function toggleCat(cat) { state.catFilter = state.catFilter===cat ? "Tous" : cat; document.getElementById("catFilter").value=state.catFilter; render(); }
+  document.getElementById("d_demarrage").addEventListener("change",e=>{
+    document.getElementById("dem-date-field").style.display=e.target.value?"":"none";
+    if(e.target.value&&!document.getElementById("d_dateDemarrage").value) document.getElementById("d_dateDemarrage").value=today();
+  });
+  document.getElementById("save-detail").addEventListener("click",async()=>{
+    ao.bm = document.getElementById("d_bm").value.toUpperCase().trim();
+    ao.datePrise = document.getElementById("d_datePrise").value;
+    ao.dateReponse = document.getElementById("d_dateReponse").value;
+    ao.consultant = document.getElementById("d_consultant").value.toUpperCase().trim();
+    ao.tjm = document.getElementById("d_tjm").value;
+    ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
+    ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
+    if(ao.bm && !ao.datePrise) ao.datePrise = today();
+    await dbPut("aos", ao);
+    renderView();
+  });
+  document.getElementById("clear-detail").addEventListener("click",async()=>{
+    if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
+    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";
+    await dbPut("aos", ao);
+    renderView();
+  });
+}
 
-// Init
-document.getElementById("updateDate").textContent = new Date().toLocaleDateString("fr-FR");
-setupFilters();
-render();
+// ===================== IMPORT =====================
+function renderImport(el) {
+  el.innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import PWise</h1>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">Copiez le texte brut depuis PWise et collez-le ici. Les nouveaux AO seront ajoutés, les AO absents seront marqués comme clos.</p>
+
+    <div class="card">
+      <div class="card-title">📄 Coller le texte ou charger un fichier</div>
+      <textarea id="import-text" style="width:100%;height:200px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le contenu copié depuis PWise..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+        <button class="btn btn-green" id="run-import">🚀 Lancer l'import</button>
+        <span style="color:var(--gray);font-size:12px">ou</span>
+        <label class="btn" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+          📎 Charger un fichier .txt
+          <input type="file" id="import-file" accept=".txt,.text" style="display:none">
+        </label>
+      </div>
+    </div>
+    <div id="import-result"></div>
+    <div id="import-history"></div>
+  `;
+
+  document.getElementById("import-file").addEventListener("change",e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{document.getElementById("import-text").value=ev.target.result;};
+    reader.readAsText(file);
+  });
+
+  document.getElementById("run-import").addEventListener("click", async()=>{
+    const raw = document.getElementById("import-text").value.trim();
+    if(!raw){alert("Collez d'abord le texte PWise.");return;}
+    const parsed = parseAOs(raw);
+    if(!parsed.length){document.getElementById("import-result").innerHTML=`<div class="import-warn" style="margin-top:16px">⚠️ Aucun AO détecté. Vérifiez le format du texte.</div>`;return;}
+
+    const existing = await dbGetAll("aos");
+    const existingMap = {};
+    existing.forEach(a=>{existingMap[a.rfc]=a;});
+    const importedRFCs = new Set(parsed.map(a=>a.rfc));
+
+    let added=0, updated=0, closed=0, unchanged=0;
+    const toSave = [];
+
+    // Add/update
+    parsed.forEach(p=>{
+      const ex = existingMap[p.rfc];
+      if(!ex){
+        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", dateCreation:today(), dateCloture:"", dernierImport:today()});
+        added++;
+      } else {
+        // Update PWise fields, keep tracking
+        let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
+        const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dernierImport:today(),
+          bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
+          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", dateCreation:ex.dateCreation||today()};
+        toSave.push(merged);
+        if(changed) updated++; else unchanged++;
+      }
+    });
+
+    // Close missing
+    existing.forEach(ex=>{
+      if(ex.statut!=="clos"&&!importedRFCs.has(ex.rfc)){
+        toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
+        closed++;
+      }
+    });
+
+    await dbPutMany("aos", toSave);
+    await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added, updated, closed, unchanged});
+
+    document.getElementById("import-result").innerHTML=`
+      <div class="import-ok" style="margin-top:16px">
+        <strong>✅ Import réussi !</strong><br>
+        📊 ${parsed.length} AO dans le fichier<br>
+        🆕 ${added} nouveau${added>1?"x":""} · ♻️ ${updated} mis à jour · 🔒 ${closed} clos · ✔️ ${unchanged} inchangé${unchanged>1?"s":""}
+      </div>`;
+
+    loadImportHistory();
+  });
+
+  loadImportHistory();
+}
+
+async function loadImportHistory() {
+  const imports = await dbGetAll("imports");
+  const el = document.getElementById("import-history");
+  if(!el||!imports.length) return;
+  const recent = imports.sort((a,b)=>(b.id||0)-(a.id||0)).slice(0,10);
+  el.innerHTML=`<div class="card" style="margin-top:16px"><div class="card-title">📜 Historique des imports</div>
+    <table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Heure</th><th>AO parsés</th><th>Nouveaux</th><th>Mis à jour</th><th>Clos</th></tr></thead>
+    <tbody>${recent.map(i=>`<tr><td>${i.date}</td><td>${i.time}</td><td>${i.nbParsed}</td><td>${i.added}</td><td>${i.updated}</td><td>${i.closed}</td></tr>`).join("")}</tbody></table></div>`;
+}
+
+// ===================== EXPORT =====================
+function renderExport(el) {
+  el.innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Export</h1>
+    <div class="card">
+      <div class="card-title">📤 Exporter les données</div>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Exportez toutes les données AO + suivi au format CSV ou JSON.</p>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-green" onclick="doExportCSV()">📥 Export CSV</button>
+        <button class="btn" onclick="doExportJSON()">📥 Export JSON (sauvegarde)</button>
+        <label class="btn" style="cursor:pointer">📎 Restaurer JSON <input type="file" accept=".json" style="display:none" onchange="doImportJSON(event)"></label>
+      </div>
+    </div>
+  `;
+}
+
+function doExportCSV(){
+  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Statut suivi;Statut AO\n";
+  allAOs.forEach(a=>{
+    const ss=a.statut==="clos"?"clos":statutSuivi(a);
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${statutLabel(ss)};${a.statut}\n`;
+  });
+  download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
+}
+
+function doExportJSON(){
+  const data = {version:1, exportDate:new Date().toISOString(), aos:allAOs};
+  download("ao_bcef_backup.json", JSON.stringify(data,null,2), "application/json");
+}
+
+async function doImportJSON(e){
+  const file=e.target.files[0]; if(!file)return;
+  const text=await file.text();
+  try{
+    const data=JSON.parse(text);
+    if(!data.aos||!data.aos.length){alert("Fichier invalide.");return;}
+    if(!confirm(`Restaurer ${data.aos.length} AO depuis la sauvegarde du ${data.exportDate||"?"} ?\nCela écrasera les données existantes.`))return;
+    await dbPutMany("aos",data.aos);
+    alert("✅ Restauration terminée !");
+    renderView();
+  }catch(err){alert("Erreur de lecture: "+err.message);}
+}
+
+function download(filename, content, type){
+  const blob=new Blob([content],{type});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();
+}
+
+// ===================== SEED — Import initial automatique =====================
+const SEED=`btnMasterDetail\nRFC00004114\nBCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))\nTM00004671\nL6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nProject Manager Risques IT & Cyber Sécurité Niveau 2\nSur Site\n13/04/2026 - 31/12/2026\n151,00\nbtnMasterDetail\nRFC00004045\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004676\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00004038\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004675\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003897\nBCEF IT MDEP Nantes Intégrateur squad Xpay Estreem\nTM00004484\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003890\nBCEF IT - Business Analyst Socle Data DHV2 (CS)\nTM00004420\nL6_BCEF IT - 2DAI 2 DATA IA\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003863\nBCEF IT - BA - Crédits Pro ER (MCS)\nTM00004311\nL6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003855\nBCEF IT-DIFA 2-MBE Tech Lead Socle MBE (CS)\nTM00004407\nL6_BCEF IT - DIFA 2 ASSETS DIGITAUX CORPORATE ET TRANSVERSAUX\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nExpert Technique Niveau 1\nSur Site\n15/04/2026 - 31/12/2026\n150,00\nbtnMasterDetail\nRFC00003835\nBCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2\nTM00004167\nL6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003827\nBCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2\nTM00004150\nL6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 3\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003797\nBCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)\nTM00004273\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003728\n[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO\nTM00004424\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/10/2026\n130,00\nbtnMasterDetail\nRFC00003679\nBCEF IT - Assurance vie - Gestion de projet (MCS)\nTM00004330\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003672\nBCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte\nTM00004274\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n03/06/2026 - 31/12/2026\n124,00\nbtnMasterDetail\nRFC00003642\nBCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK\nTM00003799\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nBCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA\nSur Site\n13/04/2026 - 30/09/2026\n118,00\nbtnMasterDetail\nRFC00003372\nBCEF IT - CBO - Analyse de Test - Contrat d Offres (CLA)\nTM00003975\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n30/03/2026 - 31/12/2026\n159,00\nbtnMasterDetail\nRFC00003355\nChargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)\nTM00003847\nL6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n06/04/2026 - 30/09/2026\n122,00\nbtnMasterDetail\nRFC00003294\nBCEF IT - CP Senior Mise en oeuvre exigences DCC2 - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)\nTM00004067\nL6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n01/04/2026 - 30/06/2026\n50,00\nbtnMasterDetail\nRFC00003018\nBCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java\nTM00003880\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n06/04/2026 - 31/12/2026\n155,00\nbtnMasterDetail\nRFC00002985\nBCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)\nTM00001894\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n02/03/2026 - 31/12/2026\n175,00\nbtnMasterDetail\nRFC00001175\nBCEF IT - OSBA4 - Epargne - BA - Reporting Transverses\nTM00001974\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00000929\nBCEF IT Projet Gestion Sous Mandat (CLA)\nTM00001888\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n16/03/2026 - 31/12/2026\n167,00`;
+
+async function seedIfEmpty(){
+  const existing = await dbGetAll("aos");
+  if(existing.length > 0) return;
+  const parsed = parseAOs(SEED);
+  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", dateCreation:today(), dateCloture:"", dernierImport:today()}));
+  await dbPutMany("aos", toSave);
+  await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
+  console.log("Seed: "+parsed.length+" AO importés");
+}
+
+async function init(){
+  await openDB();
+  await seedIfEmpty();
+  document.querySelectorAll(".nav-item").forEach(n=>{
+    n.addEventListener("click",()=>navigate(n.dataset.view));
+  });
+  renderView();
+}
+
+init();
 </script>
 </body>
 </html>
