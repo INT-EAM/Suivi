@@ -338,10 +338,19 @@ function renderDashboard(el) {
   const nonTraite = open.filter(a=>statutSuivi(a)==="ouvert").length;
   const urgent = open.filter(a=>urgency(a.dateDebut)>=2).length;
 
-  // Par domaine
+  // Par département
   const byDept = {}; open.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
   const deptEntries = Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
   const maxDept = deptEntries.length ? deptEntries[0][1] : 1;
+
+  // Par domaine (org), groupé par dept
+  const byOrg = {}; open.forEach(a=>{const o=shortOrg(a.org)||"Autre";byOrg[o]=(byOrg[o]||0)+1;});
+  const orgByDept = {};
+  open.forEach(a=>{
+    if(!orgByDept[a.dept]) orgByDept[a.dept]={};
+    const o=shortOrg(a.org)||"Autre";
+    orgByDept[a.dept][o]=(orgByDept[a.dept][o]||0)+1;
+  });
 
   // Par manager
   const byBM = {}; open.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
@@ -350,6 +359,9 @@ function renderDashboard(el) {
 
   // Par catégorie
   const byCat = {}; open.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
+
+  // Store for drilldown
+  window._dashOrg = orgByDept;
 
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Dashboard</h1>
@@ -365,9 +377,9 @@ function renderDashboard(el) {
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div class="card">
-        <div class="card-title">📂 Par département</div>
-        <div class="bar-chart">${deptEntries.map(([d,n])=>`
-          <div class="bar-row">
+        <div class="card-title" id="domain-chart-title">📂 Par département <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour voir les domaines</span></div>
+        <div class="bar-chart" id="domain-chart">${deptEntries.map(([d,n])=>`
+          <div class="bar-row dept-bar" data-dept="${d}" style="cursor:pointer">
             <div class="bar-label" title="${d}">${d}</div>
             <div class="bar-track"><div class="bar-fill" style="width:${(n/maxDept*100).toFixed(0)}%;background:var(--green)">${n}</div></div>
           </div>`).join("")}
@@ -391,6 +403,23 @@ function renderDashboard(el) {
       </div>
     </div>
   `;
+
+  // Drilldown: click dept → show domains
+  document.querySelectorAll(".dept-bar").forEach(row=>{
+    row.addEventListener("click",()=>{
+      const dept = row.dataset.dept;
+      const domains = window._dashOrg[dept]||{};
+      const entries = Object.entries(domains).sort((a,b)=>b[1]-a[1]);
+      const max = entries.length ? entries[0][1] : 1;
+      document.getElementById("domain-chart-title").innerHTML=`📂 ${dept} — Domaines <button id="back-to-dept" class="btn" style="margin-left:10px;padding:3px 10px;font-size:11px">← Retour</button>`;
+      document.getElementById("domain-chart").innerHTML=entries.map(([o,n])=>`
+        <div class="bar-row">
+          <div class="bar-label" title="${o}">${o}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(n/max*100).toFixed(0)}%;background:var(--purple)">${n}</div></div>
+        </div>`).join("");
+      document.getElementById("back-to-dept").addEventListener("click",()=>renderDashboard(el));
+    });
+  });
 }
 
 // ===================== LISTE AO =====================
