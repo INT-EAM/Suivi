@@ -451,18 +451,25 @@ function renderDashboard(el) {
   const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
 
   // Build funnel HTML
+  // Total reçu = ouverts + clos (avec mêmes filtres croisés sauf statut)
+  let totalRecu = allAOs.length;
+  if(dashF.dept) totalRecu=allAOs.filter(a=>a.dept===dashF.dept).length;
+  if(dashF.domain) totalRecu=allAOs.filter(a=>(dashF.dept?a.dept===dashF.dept:true)&&domainGroup(a.org)===dashF.domain).length;
+  if(dashF.bm) totalRecu=allAOs.filter(a=>(dashF.dept?a.dept===dashF.dept:true)&&(dashF.domain?domainGroup(a.org)===dashF.domain:true)&&(a.bm||"Non assigné")===dashF.bm).length;
+  if(dashF.cat) totalRecu=allAOs.filter(a=>(dashF.dept?a.dept===dashF.dept:true)&&(dashF.domain?domainGroup(a.org)===dashF.domain:true)&&(dashF.bm?(a.bm||"Non assigné")===dashF.bm:true)&&categorize(a.profil)===dashF.cat).length;
+  const fClos=totalRecu-total;
   const fRepondu=filtered.filter(a=>a.dateReponse).length;
   const fQualif=filtered.filter(a=>a.dateQualif).length;
   const fDem=filtered.filter(a=>a.dateDemarrage).length;
-  const fSteps=[{label:"Ouverts",n:total,color:"var(--blue)",key:"ouvert"},{label:"Répondus",n:fRepondu,color:"var(--amber)",key:"repondu"},{label:"Qualifiés",n:fQualif,color:"var(--purple)",key:"qualif"},{label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage"}];
-  const fMax=Math.max(total,1);
+  const fSteps=[{label:"Total reçu",n:totalRecu,color:"var(--gray)",key:null},{label:"Ouverts",n:total,color:"var(--blue)",key:"ouvert"},{label:"Répondus",n:fRepondu,color:"var(--amber)",key:"repondu"},{label:"Qualifiés",n:fQualif,color:"var(--purple)",key:"qualif"},{label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage"}];
+  const fMax=Math.max(totalRecu,1);
   let funnelHtml='<div style="display:flex;flex-direction:column;gap:4px">';
   fSteps.forEach((s,i)=>{
-    const pct=total?Math.round(s.n/fMax*100):0;
+    const pct=Math.round(s.n/fMax*100);
     const rate=i>0&&fSteps[i-1].n?Math.round(s.n/fSteps[i-1].n*100):null;
-    const sel=dashF.suivi===s.key;
-    funnelHtml+='<div class="bar-row dash-click" data-key="suivi" data-val="'+s.key+'" style="cursor:pointer;'+(sel?"outline:2px solid '+s.color+';border-radius:6px;":"")+'">';
-    funnelHtml+='<div style="width:70px;text-align:right;font-size:11px;color:var(--gray)">'+s.label+'</div>';
+    const sel=s.key&&dashF.suivi===s.key;
+    funnelHtml+='<div class="bar-row'+(s.key?' dash-click':'')+'" '+(s.key?'data-key="suivi" data-val="'+s.key+'"':'')+' style="'+(s.key?"cursor:pointer;":"")+(sel?"outline:2px solid '+s.color+';border-radius:6px;":"")+'">';
+    funnelHtml+='<div style="width:70px;text-align:right;font-size:11px;color:var(--gray);'+(i===0?"font-weight:700;":"")+'">'+s.label+'</div>';
     funnelHtml+='<div style="flex:1;height:28px;background:var(--gray-light);border-radius:6px;overflow:hidden">';
     funnelHtml+='<div style="height:100%;width:'+pct+'%;background:'+s.color+';border-radius:6px;display:flex;align-items:center;padding-left:8px;min-width:32px">';
     funnelHtml+='<span style="font-size:12px;font-weight:700;color:#fff">'+s.n+'</span></div></div>';
@@ -471,7 +478,7 @@ function renderDashboard(el) {
     funnelHtml+='</div>';
   });
   funnelHtml+='</div>';
-  if(total) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux global : <strong style="color:'+(fDem/total>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/total*100)+'%</strong> (ouvert → démarré)</div>';
+  if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux global : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)'+(fClos?' · <span style="color:var(--gray)">'+fClos+' clos</span>':"")+'</div>';
 
   // Build manager table HTML
   const mgrData={};
