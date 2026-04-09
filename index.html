@@ -731,6 +731,7 @@ function renderDetail(el, rfc) {
         <div><div class="lbl">Modalité</div>${ao.modalite||"—"}</div>
         <div><div class="lbl">Période</div>${ao.dateDebut} → ${ao.dateFin}</div>
         <div><div class="lbl">Durée</div><strong>${ao.nbJours} jours</strong></div>
+        <div><div class="lbl">📅 Date d'ouverture</div><input type="date" id="d_dateOuverture" value="${ao.dateOuverture||ao.dateCreation||""}" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none"></div>
       </div>
       <div class="form-section">
         <h4>📋 Suivi INTM</h4>
@@ -777,6 +778,7 @@ function renderDetail(el, rfc) {
     ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
     ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
     ao.notes = document.getElementById("d_notes").value.trim();
+    ao.dateOuverture = document.getElementById("d_dateOuverture").value;
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
     await dbPut("aos", ao);
     renderView();
@@ -837,14 +839,14 @@ function renderImport(el) {
     parsed.forEach(p=>{
       const ex = existingMap[p.rfc];
       if(!ex){
-        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateCreation:today(), dateCloture:"", dernierImport:today()});
+        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dernierImport:today()});
         added++;
       } else {
         // Update PWise fields, keep tracking
         let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
         const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dernierImport:today(),
           bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
-          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateCreation:ex.dateCreation||today()};
+          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateOuverture:ex.dateOuverture||ex.dateCreation||today(), dateCreation:ex.dateCreation||today()};
         toSave.push(merged);
         if(changed) updated++; else unchanged++;
       }
@@ -989,10 +991,10 @@ function renderExport(el) {
 }
 
 function doExportCSV(){
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
+  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
   allAOs.forEach(a=>{
     const ss=a.statut==="clos"?"clos":statutSuivi(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
   });
   download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
 }
@@ -1027,7 +1029,7 @@ async function seedIfEmpty(){
   const existing = await dbGetAll("aos");
   if(existing.length > 0) return;
   const parsed = parseAOs(SEED);
-  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateCreation:today(), dateCloture:"", dernierImport:today()}));
+  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dernierImport:today()}));
   await dbPutMany("aos", toSave);
   await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
   console.log("Seed: "+parsed.length+" AO importés");
