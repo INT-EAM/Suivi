@@ -72,6 +72,7 @@ tr.clos { opacity: 0.45; }
 .pill-qualif { background: #ede9fe; color: #6d28d9; }
 .pill-demarrage { background: #d1fae5; color: #065f46; }
 .pill-clos { background: #f1f5f9; color: #94a3b8; }
+.pill-clos-traite { background: #dbeafe; color: #1e40af; }
 th.r { text-align: right; }
 td.r { text-align: right; }
 
@@ -304,12 +305,25 @@ function statutSuivi(ao) {
   if(ao.bm || ao.datePrise) return "encours";
   return "ouvert";
 }
-function statutLabel(s) {
-  return {ouvert:"Ouvert",encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré",clos:"Clos"}[s]||s;
+function statutComplet(ao) {
+  if(ao.statut==="clos") {
+    const s=statutSuivi(ao);
+    return s==="ouvert" ? "clos_nontraite" : "clos_traite";
+  }
+  return statutSuivi(ao);
 }
-function statutPill(s) {
-  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-encours",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos"}[s]||"pill-ouvert";
-  return `<span class="status-pill ${cls}">${statutLabel(s)}</span>`;
+function hasTraitement(ao) { return !!(ao.bm||ao.datePrise||ao.dateReponse||ao.dateQualif||ao.dateDemarrage); }
+function statutLabel(s) {
+  return {ouvert:"Ouvert",encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré",clos:"Clos",clos_nontraite:"Clos sans traitement",clos_traite:"Clos traité"}[s]||s;
+}
+function statutPill(s, ao) {
+  if(s==="clos_traite" && ao) {
+    const inner=statutSuivi(ao);
+    const innerLabel={encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré"}[inner]||inner;
+    return '<span class="status-pill pill-clos-traite">Clos · '+innerLabel+'</span>';
+  }
+  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-encours",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos",clos_nontraite:"pill-clos",clos_traite:"pill-clos-traite"}[s]||"pill-ouvert";
+  return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>';
 }
 
 function today(){return new Date().toISOString().slice(0,10);}
@@ -338,10 +352,12 @@ async function loadAOs() { allAOs = await dbGetAll("aos"); }
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
   let f = allAOs;
-  if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
-  else if(filters.statut==="tous_clos") { /* keep all, no filter */ }
+  if(filters.statut==="clos_nontraite") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
+  else if(filters.statut==="clos_traite") f=f.filter(a=>a.statut==="clos"&&hasTraitement(a));
+  else if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
+  else if(filters.statut==="tous_clos") { /* all, no filter */ }
   else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
-  else f=f.filter(a=>a.statut!=="clos");
+  else { /* Tous = show all including clos */ }
   if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||""].some(v=>(v||"").toLowerCase().includes(s)));}
   if(filters.dept!=="Tous") f=f.filter(a=>a.dept===filters.dept);
   if(filters.cat!=="Tous") f=f.filter(a=>categorize(a.profil)===filters.cat);
@@ -591,7 +607,8 @@ function renderDashboard(el) {
     +'<div class="kpi"><div class="kpi-value" style="color:var(--amber)">'+encours+'</div><div class="kpi-label">En cours</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--purple)">'+qualif+'</div><div class="kpi-label">Qualifiés</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
-    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos").length+'</div><div class="kpi-label">Clos</div></div>'
+    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos"&&!hasTraitement(a)).length+'</div><div class="kpi-label">Clos sans trait.</div></div>'
+    +'<div class="kpi" id="kpi-clos-traite" style="cursor:pointer"><div class="kpi-value" style="color:#1e40af">'+allAOs.filter(a=>a.statut==="clos"&&hasTraitement(a)).length+'</div><div class="kpi-label">Clos traités</div></div>'
     +'</div>'
     +'<div class="dash-grid">'
     +'<div class="card"><div class="card-title">🔄 Funnel de conversion</div>'+funnelHtml+'</div>'
@@ -641,7 +658,13 @@ function renderDashboard(el) {
   // Clos KPI → ouvre la liste filtrée sur les clos
   const closKpi=document.getElementById("kpi-clos");
   if(closKpi) closKpi.addEventListener("click",()=>{
-    filters.statut="clos";
+    filters.statut="clos_nontraite";
+    filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
+    navigate("liste");
+  });
+  const closTraiteKpi=document.getElementById("kpi-clos-traite");
+  if(closTraiteKpi) closTraiteKpi.addEventListener("click",()=>{
+    filters.statut="clos_traite";
     filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
     navigate("liste");
   });
@@ -657,9 +680,10 @@ function renderListe(el) {
   const filtered = getFilteredAOs();
 
   let tableRows = filtered.map(a=>{
-    const cat=categorize(a.profil), u=urgency(a.dateDebut), ss=a.statut==="clos"?"clos":statutSuivi(a);
+    const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
+    const isClos=a.statut==="clos";
     const sel=selectedRFC===a.rfc;
-    return `<tr class="row${u&&ss!=="clos"?" urg"+u:""}${ss==="clos"?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}">
+    return `<tr class="row${u&&!isClos?" urg"+u:""}${isClos?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}">
       <td class="rfc-code">${a.rfc.replace("RFC0000","").replace("RFC000","")}</td>
       <td><span class="badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
       <td class="profil-cell" title="${a.profil}">${a.profil}</td>
@@ -669,7 +693,7 @@ function renderListe(el) {
       <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
-      <td>${statutPill(ss)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
+      <td>${statutPill(sc,a)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
     </tr>`;
   }).join("");
 
@@ -680,13 +704,14 @@ function renderListe(el) {
       <select id="f_dept">${depts.map(d=>`<option value="${d}"${filters.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
       <select id="f_cat">${cats.map(c=>`<option value="${c}"${filters.cat===c?" selected":""}>${c==="Tous"?"Catégorie":c}</option>`).join("")}</select>
       <select id="f_statut">
-        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Ouverts (tous)</option>
-        <option value="tous_clos"${filters.statut==="tous_clos"?" selected":""}>📦 Tous y.c. clos</option>
+        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Tous les AO</option>
         <option value="ouvert"${filters.statut==="ouvert"?" selected":""}>⚪ Non traité</option>
         <option value="encours"${filters.statut==="encours"?" selected":""}>🟡 En cours</option>
         <option value="qualif"${filters.statut==="qualif"?" selected":""}>🟣 Qualifié</option>
         <option value="demarrage"${filters.statut==="demarrage"?" selected":""}>🟢 Démarré</option>
-        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Clos uniquement</option>
+        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Tous clos</option>
+        <option value="clos_nontraite"${filters.statut==="clos_nontraite"?" selected":""}>⚫ Clos sans traitement</option>
+        <option value="clos_traite"${filters.statut==="clos_traite"?" selected":""}>🔵 Clos traités</option>
       </select>
       <select id="f_bm">${bms.map(b=>`<option value="${b}"${filters.bm===b?" selected":""}>${b==="Tous"?"Manager":b}</option>`).join("")}</select>
       <select id="f_period">
@@ -1012,7 +1037,7 @@ function renderExport(el) {
 function doExportCSV(){
   let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
   allAOs.forEach(a=>{
-    const ss=a.statut==="clos"?"clos":statutSuivi(a);
+    const ss=statutComplet(a);
     csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
   });
   download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
