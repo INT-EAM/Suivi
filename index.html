@@ -328,6 +328,31 @@ function statutPill(s, ao) {
 
 function today(){return new Date().toISOString().slice(0,10);}
 
+function periodKey(dateStr, mode) {
+  const d = dateStr ? (dateStr.includes("/") ? parseDate(dateStr) : new Date(dateStr)) : null;
+  if(!d || isNaN(d)) return null;
+  const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
+  if(mode==="week") {
+    const jan1=new Date(y,0,1); const days=Math.floor((d-jan1)/86400000);
+    const w=Math.ceil((days+jan1.getDay()+1)/7);
+    return y+"-S"+String(w).padStart(2,"0");
+  }
+  if(mode==="month") return y+"-"+String(m+1).padStart(2,"0");
+  if(mode==="quarter") return y+"-T"+Math.ceil((m+1)/3);
+  if(mode==="semester") return y+"-S"+(m<6?"1":"2");
+  if(mode==="year") return ""+y;
+  return y+"-"+String(m+1).padStart(2,"0");
+}
+
+function periodLabel(key, mode) {
+  if(!key) return "—";
+  if(mode==="week") { const [y,w]=key.split("-S"); return "Sem. "+parseInt(w)+" "+y; }
+  if(mode==="month") { const [y,m]=key.split("-"); const mois=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]; return mois[parseInt(m)-1]+" "+y; }
+  if(mode==="quarter") return key.replace("-T"," T");
+  if(mode==="semester") return key.replace("-S"," Sem. ");
+  return key;
+}
+
 function periodFilter(dateStr, period) {
   if(!period||period==="all") return true;
   const d = parseDate(dateStr);
@@ -376,7 +401,7 @@ function getFilteredAOs() {
 function navigate(view) {
   currentView = view;
   selectedRFC = null;
-  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null,suivi:null};
+  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"};
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
   renderView();
 }
@@ -397,7 +422,7 @@ async function renderView() {
 
 // ===================== DASHBOARD =====================
 // Dashboard filter state
-let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null };
+let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null, periodView:"month" };
 
 function dashFilteredAOs() {
   let f = dashF.suivi==="tous_clos" ? [...allAOs] : getOpenAOs();
@@ -596,6 +621,71 @@ function renderDashboard(el) {
     tagsHtml+='</div>';
   }
 
+  // Build period activity table
+  const pMode=dashF.periodView||"month";
+  const periodBuckets={};
+  allAOs.forEach(a=>{
+    // Apply current cross-filters (except suivi)
+    if(dashF.dept && a.dept!==dashF.dept) return;
+    if(dashF.domain && domainGroup(a.org)!==dashF.domain) return;
+    if(dashF.bm && (a.bm||"Non assigné")!==dashF.bm) return;
+    if(dashF.cat && categorize(a.profil)!==dashF.cat) return;
+    const pk=periodKey(a.dateOuverture||a.dateCreation, pMode);
+    if(!pk) return;
+    if(!periodBuckets[pk]) periodBuckets[pk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0};
+    periodBuckets[pk].recu++;
+    if(a.dateReponse) { const rk=periodKey(a.dateReponse,pMode); if(rk&&periodBuckets[rk]) periodBuckets[rk].repondu++; else if(rk){periodBuckets[rk]={recu:0,repondu:1,qualif:0,demarrage:0,clos:0};} }
+    if(a.dateQualif) { const qk=periodKey(a.dateQualif,pMode); if(qk&&periodBuckets[qk]) periodBuckets[qk].qualif++; else if(qk){periodBuckets[qk]={recu:0,repondu:0,qualif:1,demarrage:0,clos:0};} }
+    if(a.dateDemarrage) { const dk=periodKey(a.dateDemarrage,pMode); if(dk&&periodBuckets[dk]) periodBuckets[dk].demarrage++; else if(dk){periodBuckets[dk]={recu:0,repondu:0,qualif:0,demarrage:1,clos:0};} }
+    if(a.statut==="clos"&&a.dateCloture) { const ck=periodKey(a.dateCloture,pMode); if(ck&&periodBuckets[ck]) periodBuckets[ck].clos++; else if(ck){periodBuckets[ck]={recu:0,repondu:0,qualif:0,demarrage:0,clos:1};} }
+  });
+  const periodEntries=Object.entries(periodBuckets).sort((a,b)=>b[0].localeCompare(a[0]));
+  const periodModes=[{k:"week",l:"Semaine"},{k:"month",l:"Mois"},{k:"quarter",l:"Trimestre"},{k:"semester",l:"Semestre"},{k:"year",l:"Année"}];
+  let periodHtml='<div style="display:flex;gap:6px;margin-bottom:12px">';
+  periodModes.forEach(pm=>{
+    const sel=pMode===pm.k;
+    periodHtml+='<button class="btn period-btn" data-period="'+pm.k+'" style="font-size:11px;padding:4px 12px;'+(sel?"background:var(--green);color:#fff;border-color:var(--green);":"")+'">'+pm.l+'</button>';
+  });
+  periodHtml+='</div>';
+  if(periodEntries.length){
+    periodHtml+='<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">';
+    periodHtml+='<thead><tr style="border-bottom:1px solid var(--border)">';
+    periodHtml+='<th style="text-align:left;padding:6px 8px;font-weight:600;color:var(--gray)">Période</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">📥 Reçus</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">📨 Répondus</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">🟣 Qualifiés</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">🟢 Démarrés</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">⚫ Clos</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">📊 Taux</th>';
+    periodHtml+='</tr></thead><tbody>';
+    periodEntries.forEach(([pk,b])=>{
+      const taux=b.recu?Math.round(b.demarrage/b.recu*100):0;
+      periodHtml+='<tr style="border-bottom:1px solid #f8fafc">';
+      periodHtml+='<td style="padding:5px 8px;font-weight:600;white-space:nowrap">'+periodLabel(pk,pMode)+'</td>';
+      periodHtml+='<td style="text-align:center;font-weight:700;color:var(--blue)">'+b.recu+'</td>';
+      periodHtml+='<td style="text-align:center">'+b.repondu+'</td>';
+      periodHtml+='<td style="text-align:center">'+b.qualif+'</td>';
+      periodHtml+='<td style="text-align:center">'+b.demarrage+'</td>';
+      periodHtml+='<td style="text-align:center;color:var(--gray)">'+b.clos+'</td>';
+      periodHtml+='<td style="text-align:center;font-weight:600;color:'+(taux>=15?"var(--green)":"var(--amber)")+'">'+taux+'%</td>';
+      periodHtml+='</tr>';
+    });
+    // Totaux
+    const totals=periodEntries.reduce((t,[,b])=>({recu:t.recu+b.recu,repondu:t.repondu+b.repondu,qualif:t.qualif+b.qualif,demarrage:t.demarrage+b.demarrage,clos:t.clos+b.clos}),{recu:0,repondu:0,qualif:0,demarrage:0,clos:0});
+    const tauxTotal=totals.recu?Math.round(totals.demarrage/totals.recu*100):0;
+    periodHtml+='<tr style="border-top:2px solid var(--border);font-weight:700">';
+    periodHtml+='<td style="padding:6px 8px">TOTAL</td>';
+    periodHtml+='<td style="text-align:center;color:var(--blue)">'+totals.recu+'</td>';
+    periodHtml+='<td style="text-align:center">'+totals.repondu+'</td>';
+    periodHtml+='<td style="text-align:center">'+totals.qualif+'</td>';
+    periodHtml+='<td style="text-align:center">'+totals.demarrage+'</td>';
+    periodHtml+='<td style="text-align:center;color:var(--gray)">'+totals.clos+'</td>';
+    periodHtml+='<td style="text-align:center;color:'+(tauxTotal>=15?"var(--green)":"var(--amber)")+'">'+tauxTotal+'%</td>';
+    periodHtml+='</tr></tbody></table></div>';
+  } else {
+    periodHtml+='<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px">Aucune donnée pour cette période</div>';
+  }
+
   el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
     +'<h1 style="font-size:24px;font-weight:800">Dashboard</h1>'
     +(dashHasFilters()?'<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>':"")
@@ -619,6 +709,7 @@ function renderDashboard(el) {
     +'<div class="card"><div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div class="bar-chart">'+bmChartHtml+'</div></div>'
     +'</div>'
     +'<div class="card" style="margin-top:0"><div class="card-title">🎯 Par type de profil <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+catHtml+'</div></div>'
+    +'<div class="card"><div class="card-title">📅 Activité par période</div>'+periodHtml+'</div>'
     +(dashHasFilters()?'<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des '+total+' AO filtrés</button></div>':"");
 
   // Bind events
@@ -643,7 +734,7 @@ function renderDashboard(el) {
   });
 
   const clearBtn=document.getElementById("dash-clear");
-  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null}; renderDashboard(document.getElementById("main-content")); });
+  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"}; renderDashboard(document.getElementById("main-content")); });
 
   const listBtn=document.getElementById("dash-to-list");
   if(listBtn) listBtn.addEventListener("click",()=>{
@@ -667,6 +758,14 @@ function renderDashboard(el) {
     filters.statut="clos_traite";
     filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
     navigate("liste");
+  });
+
+  // Period view selector
+  document.querySelectorAll(".period-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      dashF.periodView=btn.dataset.period;
+      renderDashboard(document.getElementById("main-content"));
+    });
   });
 }
 
