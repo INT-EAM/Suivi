@@ -339,6 +339,7 @@ function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
   let f = allAOs;
   if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
+  else if(filters.statut==="tous_clos") { /* keep all, no filter */ }
   else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
   else f=f.filter(a=>a.statut!=="clos");
   if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||""].some(v=>(v||"").toLowerCase().includes(s)));}
@@ -383,13 +384,14 @@ async function renderView() {
 let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null };
 
 function dashFilteredAOs() {
-  let f = getOpenAOs();
+  let f = dashF.suivi==="tous_clos" ? [...allAOs] : getOpenAOs();
   if(dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
   if(dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
   if(dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
   if(dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
   if(dashF.suivi) {
-    if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
+    if(dashF.suivi==="tous_clos") { /* include all, no filter - just used for visual selection */ }
+    else if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
     else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse);
     else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif);
     else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
@@ -417,7 +419,8 @@ function renderDashboard(el) {
     if(exclude!=="bm" && dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
     if(exclude!=="cat" && dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
     if(exclude!=="suivi" && dashF.suivi) {
-      if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
+      if(dashF.suivi==="tous_clos") { /* no filter */ }
+      else if(dashF.suivi==="ouvert") f=f.filter(a=>!a.dateReponse&&!a.dateQualif&&!a.dateDemarrage);
       else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse);
       else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif);
       else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
@@ -461,7 +464,7 @@ function renderDashboard(el) {
   const fRepondu=filtered.filter(a=>a.dateReponse).length;
   const fQualif=filtered.filter(a=>a.dateQualif).length;
   const fDem=filtered.filter(a=>a.dateDemarrage).length;
-  const fSteps=[{label:"Total reçu",n:totalRecu,color:"var(--gray)",key:null},{label:"Ouverts",n:total,color:"var(--blue)",key:"ouvert"},{label:"Répondus",n:fRepondu,color:"var(--amber)",key:"repondu"},{label:"Qualifiés",n:fQualif,color:"var(--purple)",key:"qualif"},{label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage"}];
+  const fSteps=[{label:"Total reçu",n:totalRecu,color:"var(--gray)",key:"tous_clos"},{label:"Ouverts",n:total,color:"var(--blue)",key:"ouvert"},{label:"Répondus",n:fRepondu,color:"var(--amber)",key:"repondu"},{label:"Qualifiés",n:fQualif,color:"var(--purple)",key:"qualif"},{label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage"}];
   const fMax=Math.max(totalRecu,1);
   let funnelHtml='<div style="display:flex;flex-direction:column;gap:4px">';
   fSteps.forEach((s,i)=>{
@@ -566,7 +569,7 @@ function renderDashboard(el) {
   if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
   if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
   if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
-  if(dashF.suivi) tags.push({k:"suivi",v:{ouvert:"Ouverts",repondu:"Répondus",qualif:"Qualifiés",demarrage:"Démarrés"}[dashF.suivi]||dashF.suivi});
+  if(dashF.suivi) tags.push({k:"suivi",v:{tous_clos:"Total reçu",ouvert:"Ouverts",repondu:"Répondus",qualif:"Qualifiés",demarrage:"Démarrés"}[dashF.suivi]||dashF.suivi});
 
   let tagsHtml='';
   if(tags.length){
@@ -588,7 +591,7 @@ function renderDashboard(el) {
     +'<div class="kpi"><div class="kpi-value" style="color:var(--amber)">'+encours+'</div><div class="kpi-label">En cours</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--purple)">'+qualif+'</div><div class="kpi-label">Qualifiés</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos").length+'</div><div class="kpi-label">Clos</div></div>'
+    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos").length+'</div><div class="kpi-label">Clos</div></div>'
     +'</div>'
     +'<div class="dash-grid">'
     +'<div class="card"><div class="card-title">🔄 Funnel de conversion</div>'+funnelHtml+'</div>'
@@ -627,11 +630,19 @@ function renderDashboard(el) {
 
   const listBtn=document.getElementById("dash-to-list");
   if(listBtn) listBtn.addEventListener("click",()=>{
-    // Transfer dash filters to list filters
     filters.dept=dashF.dept||"Tous";
     filters.cat=dashF.cat||"Tous";
     filters.bm=dashF.bm||"Tous";
+    filters.statut=dashF.suivi||"Tous";
     if(dashF.domain) filters.search=dashF.domain;
+    navigate("liste");
+  });
+
+  // Clos KPI → ouvre la liste filtrée sur les clos
+  const closKpi=document.getElementById("kpi-clos");
+  if(closKpi) closKpi.addEventListener("click",()=>{
+    filters.statut="clos";
+    filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
     navigate("liste");
   });
 }
@@ -669,12 +680,13 @@ function renderListe(el) {
       <select id="f_dept">${depts.map(d=>`<option value="${d}"${filters.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
       <select id="f_cat">${cats.map(c=>`<option value="${c}"${filters.cat===c?" selected":""}>${c==="Tous"?"Catégorie":c}</option>`).join("")}</select>
       <select id="f_statut">
-        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Statut suivi</option>
-        <option value="ouvert"${filters.statut==="ouvert"?" selected":""}>⚪ Ouvert</option>
+        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Ouverts (tous)</option>
+        <option value="tous_clos"${filters.statut==="tous_clos"?" selected":""}>📦 Tous y.c. clos</option>
+        <option value="ouvert"${filters.statut==="ouvert"?" selected":""}>⚪ Non traité</option>
         <option value="encours"${filters.statut==="encours"?" selected":""}>🟡 En cours</option>
         <option value="qualif"${filters.statut==="qualif"?" selected":""}>🟣 Qualifié</option>
         <option value="demarrage"${filters.statut==="demarrage"?" selected":""}>🟢 Démarré</option>
-        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Clos</option>
+        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Clos uniquement</option>
       </select>
       <select id="f_bm">${bms.map(b=>`<option value="${b}"${filters.bm===b?" selected":""}>${b==="Tous"?"Manager":b}</option>`).join("")}</select>
       <select id="f_period">
