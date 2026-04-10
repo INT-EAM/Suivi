@@ -528,10 +528,11 @@ function renderDashboard(el) {
   // Build manager table HTML
   const mgrData={};
   filtered.forEach(a=>{
-    const bm=a.bm||"Non assigné";
-    if(!mgrData[bm]) mgrData[bm]={total:0,ouvert:0,repondu:0,qualif:0,demarrage:0,delais:[]};
+    const bm=a.bm;
+    if(!bm) return; // skip non-assigned
+    if(!mgrData[bm]) mgrData[bm]={total:0,aTraiter:0,repondu:0,qualif:0,demarrage:0,delais:[]};
     mgrData[bm].total++;
-    if(statutSuivi(a)==="ouvert") mgrData[bm].ouvert++;
+    if(bm && !a.dateReponse) mgrData[bm].aTraiter++;
     if(a.dateReponse) mgrData[bm].repondu++;
     if(a.dateQualif) mgrData[bm].qualif++;
     if(a.dateDemarrage) mgrData[bm].demarrage++;
@@ -540,7 +541,7 @@ function renderDashboard(el) {
       if(!isNaN(d1)&&!isNaN(d2)) mgrData[bm].delais.push(Math.round((d2-d1)/86400000));
     }
   });
-  const mgrEntries=Object.entries(mgrData).sort((a,b)=>b[1].total-a[1].total);
+  const mgrEntries=Object.entries(mgrData).sort((a,b)=>b[1].aTraiter-a[1].aTraiter||b[1].total-a[1].total);
   let mgrHtml='';
   if(!mgrEntries.length){ mgrHtml='<div style="color:var(--gray);font-size:13px">Aucun BM assigné</div>'; }
   else {
@@ -558,7 +559,7 @@ function renderDashboard(el) {
       const sel=dashF.bm===bm;
       mgrHtml+='<tr class="dash-click" data-key="bm" data-val="'+bm+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;'+(sel?"background:#e0f2fe;":"")+'">';
       mgrHtml+='<td style="padding:5px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
-      mgrHtml+='<td style="text-align:center;font-weight:700;font-size:14px;color:'+(s.ouvert>3?"var(--red)":s.ouvert>0?"var(--amber)":"var(--green)")+'">'+s.ouvert+'</td>';
+      mgrHtml+='<td style="text-align:center;font-weight:700;font-size:14px;color:'+(s.aTraiter>3?"var(--red)":s.aTraiter>0?"var(--amber)":"var(--green)")+'">'+s.aTraiter+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.repondu+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.qualif+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
