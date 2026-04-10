@@ -553,17 +553,27 @@ function renderDashboard(el) {
   funnelHtml+='</div>';
   if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)</div>';
 
-  // Build manager table HTML
+  // Build manager table HTML — includes clos traités
   const mgrData={};
-  filtered.forEach(a=>{
+  // Use all AOs with current cross-filters (not just open)
+  const mgrSource = allAOs.filter(a=>{
+    if(dashF.dept && a.dept!==dashF.dept) return false;
+    if(dashF.domain && domainGroup(a.org)!==dashF.domain) return false;
+    if(dashF.cat && categorize(a.profil)!==dashF.cat) return false;
+    return true;
+  });
+  mgrSource.forEach(a=>{
     const bm=a.bm;
-    if(!bm) return; // skip non-assigned
-    if(!mgrData[bm]) mgrData[bm]={total:0,aTraiter:0,repondu:0,qualif:0,demarrage:0,delais:[]};
+    if(!bm) return;
+    if(!mgrData[bm]) mgrData[bm]={total:0,aTraiter:0,repondu:0,qualif:0,demarrage:0,closTraite:0,delais:[]};
     mgrData[bm].total++;
-    if(bm && !a.dateReponse) mgrData[bm].aTraiter++;
-    if(a.dateReponse) mgrData[bm].repondu++;
-    if(a.dateQualif) mgrData[bm].qualif++;
-    if(a.dateDemarrage) mgrData[bm].demarrage++;
+    if(a.statut==="clos" && hasTraitement(a)) { mgrData[bm].closTraite++; }
+    else if(a.statut!=="clos") {
+      if(!a.dateReponse) mgrData[bm].aTraiter++;
+      if(a.dateReponse) mgrData[bm].repondu++;
+      if(a.dateQualif) mgrData[bm].qualif++;
+      if(a.dateDemarrage) mgrData[bm].demarrage++;
+    }
     if(a.datePrise&&a.dateReponse){
       const d1=new Date(a.datePrise),d2=new Date(a.dateReponse);
       if(!isNaN(d1)&&!isNaN(d2)) mgrData[bm].delais.push(Math.round((d2-d1)/86400000));
@@ -575,10 +585,11 @@ function renderDashboard(el) {
   else {
     mgrHtml='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
     mgrHtml+='<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--gray)">BM</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Non traités">⚪ À traiter</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Attribués non répondus">⚪ À traiter</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Répondus">📨 Rép.</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Qualifiés">🟣 Qual.</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Démarrés">🟢 Dém.</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Clos traités">🔵 Clos</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Délai moyen réponse">⏱️ moy.</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Total AO">Total</th>';
     mgrHtml+='</tr></thead><tbody>';
@@ -591,6 +602,7 @@ function renderDashboard(el) {
       mgrHtml+='<td style="text-align:center">'+s.repondu+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.qualif+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
+      mgrHtml+='<td style="text-align:center;color:#1e40af">'+s.closTraite+'</td>';
       mgrHtml+='<td style="text-align:center;font-size:11px;color:'+(avg&&avg>5?"var(--amber)":"var(--green)")+'">'+(avg!==null?avg+"j":"—")+'</td>';
       mgrHtml+='<td style="text-align:center;color:var(--gray)">'+s.total+'</td>';
       mgrHtml+='</tr>';
@@ -1013,12 +1025,12 @@ function renderImport(el) {
     parsed.forEach(p=>{
       const ex = existingMap[p.rfc];
       if(!ex){
-        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dernierImport:today()});
+        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()});
         added++;
       } else {
         // Update PWise fields, keep tracking
         let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
-        const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dernierImport:today(),
+        const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport:today(),
           bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
           dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateOuverture:ex.dateOuverture||ex.dateCreation||today(), dateCreation:ex.dateCreation||today()};
         toSave.push(merged);
@@ -1026,22 +1038,40 @@ function renderImport(el) {
       }
     });
 
-    // Close missing
+    // Close missing — with grace period for responded AOs
+    let pending=0;
     existing.forEach(ex=>{
-      if(ex.statut!=="clos"&&!importedRFCs.has(ex.rfc)){
-        toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
-        closed++;
+      if(ex.statut==="clos"||importedRFCs.has(ex.rfc)) return;
+      // AO has been responded to → grace period of 30 days
+      if(ex.dateReponse) {
+        const dispDate = ex.dateDisparition || today();
+        const daysSinceDisp = Math.round((new Date() - new Date(dispDate)) / 86400000);
+        if(daysSinceDisp < 30) {
+          // Keep open but mark as "disappeared"
+          toSave.push({...ex, dateDisparition: ex.dateDisparition || today(), dernierImport:today()});
+          pending++;
+          return;
+        }
+        // 30+ days gone → close
       }
+      toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
+      closed++;
+    });
+
+    // AOs that reappear → clear dateDisparition
+    parsed.forEach(p=>{
+      const saved = toSave.find(s=>s.rfc===p.rfc);
+      if(saved && saved.dateDisparition) saved.dateDisparition="";
     });
 
     await dbPutMany("aos", toSave);
-    await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added, updated, closed, unchanged});
+    await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added, updated, closed, pending, unchanged});
 
     document.getElementById("import-result").innerHTML=`
       <div class="import-ok" style="margin-top:16px">
         <strong>✅ Import réussi !</strong><br>
         📊 ${parsed.length} AO dans le fichier<br>
-        🆕 ${added} nouveau${added>1?"x":""} · ♻️ ${updated} mis à jour · 🔒 ${closed} clos · ✔️ ${unchanged} inchangé${unchanged>1?"s":""}
+        🆕 ${added} nouveau${added>1?"x":""} · ♻️ ${updated} mis à jour · 🔒 ${closed} clos · ✔️ ${unchanged} inchangé${unchanged>1?"s":""}${pending?` · ⏳ ${pending} en sursis (répondus, clos dans <30j)`:""}
       </div>`;
 
     loadImportHistory();
@@ -1203,7 +1233,7 @@ async function seedIfEmpty(){
   const existing = await dbGetAll("aos");
   if(existing.length > 0) return;
   const parsed = parseAOs(SEED);
-  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dernierImport:today()}));
+  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()}));
   await dbPutMany("aos", toSave);
   await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
   console.log("Seed: "+parsed.length+" AO importés");
