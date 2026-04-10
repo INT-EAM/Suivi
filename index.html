@@ -69,6 +69,7 @@ tr.clos { opacity: 0.45; }
 .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
 .pill-ouvert { background: #dbeafe; color: #1d4ed8; }
 .pill-encours { background: #fef3c7; color: #92400e; }
+.pill-repondu { background: #fed7aa; color: #9a3412; }
 .pill-qualif { background: #ede9fe; color: #6d28d9; }
 .pill-demarrage { background: #d1fae5; color: #065f46; }
 .pill-clos { background: #f1f5f9; color: #94a3b8; }
@@ -322,7 +323,7 @@ function statutPill(s, ao) {
     const innerLabel={encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré"}[inner]||inner;
     return '<span class="status-pill pill-clos-traite">Clos · '+innerLabel+'</span>';
   }
-  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-encours",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos",clos_nontraite:"pill-clos",clos_traite:"pill-clos-traite"}[s]||"pill-ouvert";
+  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-repondu",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos",clos_nontraite:"pill-clos",clos_traite:"pill-clos-traite"}[s]||"pill-ouvert";
   return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>';
 }
 
@@ -545,24 +546,24 @@ function renderDashboard(el) {
   else {
     mgrHtml='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
     mgrHtml+='<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--gray)">BM</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Total AO">Total</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Non traités">⚪</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Répondus">📨</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Qualifiés">🟣</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Démarrés">🟢</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Non traités">⚪ À traiter</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Répondus">📨 Rép.</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Qualifiés">🟣 Qual.</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Démarrés">🟢 Dém.</th>';
     mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Délai moyen réponse">⏱️ moy.</th>';
+    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Total AO">Total</th>';
     mgrHtml+='</tr></thead><tbody>';
     mgrEntries.forEach(([bm,s])=>{
       const avg=s.delais.length?Math.round(s.delais.reduce((a,b)=>a+b,0)/s.delais.length):null;
       const sel=dashF.bm===bm;
       mgrHtml+='<tr class="dash-click" data-key="bm" data-val="'+bm+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;'+(sel?"background:#e0f2fe;":"")+'">';
       mgrHtml+='<td style="padding:5px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
-      mgrHtml+='<td style="text-align:center;font-weight:700">'+s.total+'</td>';
-      mgrHtml+='<td style="text-align:center;color:'+(s.ouvert>3?"var(--red)":"inherit")+'">'+s.ouvert+'</td>';
+      mgrHtml+='<td style="text-align:center;font-weight:700;font-size:14px;color:'+(s.ouvert>3?"var(--red)":s.ouvert>0?"var(--amber)":"var(--green)")+'">'+s.ouvert+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.repondu+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.qualif+'</td>';
       mgrHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
       mgrHtml+='<td style="text-align:center;font-size:11px;color:'+(avg&&avg>5?"var(--amber)":"var(--green)")+'">'+(avg!==null?avg+"j":"—")+'</td>';
+      mgrHtml+='<td style="text-align:center;color:var(--gray)">'+s.total+'</td>';
       mgrHtml+='</tr>';
     });
     mgrHtml+='</tbody></table>';
