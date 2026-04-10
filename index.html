@@ -663,11 +663,11 @@ function renderDashboard(el) {
     tagsHtml+='</div>';
   }
 
-  // Build period activity table
+  // Build period activity table with per-period per-manager data
   const pMode=dashF.periodView||"month";
   const periodBuckets={};
+  const periodByBM={}; // periodKey → { bmName → {recu,repondu,qualif,demarrage,clos} }
   allAOs.forEach(a=>{
-    // Apply current cross-filters (except suivi)
     if(dashF.dept && a.dept!==dashF.dept) return;
     if(dashF.domain && domainGroup(a.org)!==dashF.domain) return;
     if(dashF.bm && (a.bm||"Non assigné")!==dashF.bm) return;
@@ -675,12 +675,18 @@ function renderDashboard(el) {
     const pk=periodKey(a.dateOuverture||a.dateCreation, pMode);
     if(!pk) return;
     if(!periodBuckets[pk]) periodBuckets[pk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0};
+    if(!periodByBM[pk]) periodByBM[pk]={};
     periodBuckets[pk].recu++;
-    if(a.dateReponse) { const rk=periodKey(a.dateReponse,pMode); if(rk&&periodBuckets[rk]) periodBuckets[rk].repondu++; else if(rk){periodBuckets[rk]={recu:0,repondu:1,qualif:0,demarrage:0,clos:0};} }
-    if(a.dateQualif) { const qk=periodKey(a.dateQualif,pMode); if(qk&&periodBuckets[qk]) periodBuckets[qk].qualif++; else if(qk){periodBuckets[qk]={recu:0,repondu:0,qualif:1,demarrage:0,clos:0};} }
-    if(a.dateDemarrage) { const dk=periodKey(a.dateDemarrage,pMode); if(dk&&periodBuckets[dk]) periodBuckets[dk].demarrage++; else if(dk){periodBuckets[dk]={recu:0,repondu:0,qualif:0,demarrage:1,clos:0};} }
-    if(a.statut==="clos"&&a.dateCloture) { const ck=periodKey(a.dateCloture,pMode); if(ck&&periodBuckets[ck]) periodBuckets[ck].clos++; else if(ck){periodBuckets[ck]={recu:0,repondu:0,qualif:0,demarrage:0,clos:1};} }
+    const bm=a.bm||"Non assigné";
+    if(!periodByBM[pk][bm]) periodByBM[pk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0};
+    periodByBM[pk][bm].recu++;
+    if(a.dateReponse) { const rk=periodKey(a.dateReponse,pMode); if(!periodBuckets[rk]) periodBuckets[rk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[rk].repondu++; if(!periodByBM[rk]) periodByBM[rk]={}; if(!periodByBM[rk][bm]) periodByBM[rk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[rk][bm].repondu++; }
+    if(a.dateQualif) { const qk=periodKey(a.dateQualif,pMode); if(!periodBuckets[qk]) periodBuckets[qk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[qk].qualif++; if(!periodByBM[qk]) periodByBM[qk]={}; if(!periodByBM[qk][bm]) periodByBM[qk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[qk][bm].qualif++; }
+    if(a.dateDemarrage) { const dk=periodKey(a.dateDemarrage,pMode); if(!periodBuckets[dk]) periodBuckets[dk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[dk].demarrage++; if(!periodByBM[dk]) periodByBM[dk]={}; if(!periodByBM[dk][bm]) periodByBM[dk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[dk][bm].demarrage++; }
+    if(a.statut==="clos"&&a.dateCloture) { const ck=periodKey(a.dateCloture,pMode); if(!periodBuckets[ck]) periodBuckets[ck]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[ck].clos++; if(!periodByBM[ck]) periodByBM[ck]={}; if(!periodByBM[ck][bm]) periodByBM[ck][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[ck][bm].clos++; }
   });
+  window._periodByBM=periodByBM;
+  window._periodMode=pMode;
   const periodEntries=Object.entries(periodBuckets).sort((a,b)=>b[0].localeCompare(a[0]));
   const periodModes=[{k:"week",l:"Semaine"},{k:"month",l:"Mois"},{k:"quarter",l:"Trimestre"},{k:"semester",l:"Semestre"},{k:"year",l:"Année"}];
   let periodHtml='<div style="display:flex;gap:6px;margin-bottom:12px">';
@@ -694,16 +700,16 @@ function renderDashboard(el) {
     periodHtml+='<thead><tr style="border-bottom:1px solid var(--border)">';
     periodHtml+='<th style="text-align:left;padding:6px 8px;font-weight:600;color:var(--gray)">Période</th>';
     periodHtml+='<th style="text-align:center;padding:6px 4px">📥 Reçus</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">📨 Répondus</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">🟣 Qualifiés</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">🟢 Démarrés</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">📨 Rép.</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">🟣 Qual.</th>';
+    periodHtml+='<th style="text-align:center;padding:6px 4px">🟢 Dém.</th>';
     periodHtml+='<th style="text-align:center;padding:6px 4px">⚫ Clos</th>';
     periodHtml+='<th style="text-align:center;padding:6px 4px">📊 Taux</th>';
     periodHtml+='</tr></thead><tbody>';
     periodEntries.forEach(([pk,b])=>{
       const taux=b.recu?Math.round(b.demarrage/b.recu*100):0;
-      periodHtml+='<tr style="border-bottom:1px solid #f8fafc">';
-      periodHtml+='<td style="padding:5px 8px;font-weight:600;white-space:nowrap">'+periodLabel(pk,pMode)+'</td>';
+      periodHtml+='<tr class="period-row" data-pk="'+pk+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;transition:background 0.1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+      periodHtml+='<td style="padding:5px 8px;font-weight:600;white-space:nowrap">▸ '+periodLabel(pk,pMode)+'</td>';
       periodHtml+='<td style="text-align:center;font-weight:700;color:var(--blue)">'+b.recu+'</td>';
       periodHtml+='<td style="text-align:center">'+b.repondu+'</td>';
       periodHtml+='<td style="text-align:center">'+b.qualif+'</td>';
@@ -711,6 +717,8 @@ function renderDashboard(el) {
       periodHtml+='<td style="text-align:center;color:var(--gray)">'+b.clos+'</td>';
       periodHtml+='<td style="text-align:center;font-weight:600;color:'+(taux>=15?"var(--green)":"var(--amber)")+'">'+taux+'%</td>';
       periodHtml+='</tr>';
+      // Hidden sub-table placeholder
+      periodHtml+='<tr class="period-detail" data-pk="'+pk+'" style="display:none"><td colspan="7" style="padding:0"></td></tr>';
     });
     // Totaux
     const totals=periodEntries.reduce((t,[,b])=>({recu:t.recu+b.recu,repondu:t.repondu+b.repondu,qualif:t.qualif+b.qualif,demarrage:t.demarrage+b.demarrage,clos:t.clos+b.clos}),{recu:0,repondu:0,qualif:0,demarrage:0,clos:0});
@@ -808,6 +816,54 @@ function renderDashboard(el) {
     btn.addEventListener("click",()=>{
       dashF.periodView=btn.dataset.period;
       renderDashboard(document.getElementById("main-content"));
+    });
+  });
+
+  // Period row click → expand manager detail
+  document.querySelectorAll(".period-row").forEach(row=>{
+    row.addEventListener("click",()=>{
+      const pk=row.dataset.pk;
+      const detailRow=document.querySelector('.period-detail[data-pk="'+pk+'"]');
+      if(!detailRow) return;
+      // Toggle
+      if(detailRow.style.display!=="none"){
+        detailRow.style.display="none";
+        row.querySelector("td").textContent="▸ "+periodLabel(pk,window._periodMode);
+        return;
+      }
+      // Collapse others
+      document.querySelectorAll(".period-detail").forEach(d=>d.style.display="none");
+      document.querySelectorAll(".period-row td:first-child").forEach(td=>{
+        if(td.textContent.startsWith("▾")) td.textContent="▸"+td.textContent.slice(1);
+      });
+      // Expand this one
+      row.querySelector("td").textContent="▾ "+periodLabel(pk,window._periodMode);
+      const bmData=window._periodByBM[pk]||{};
+      const bmEntries=Object.entries(bmData).sort((a,b)=>b[1].recu-a[1].recu);
+      let subHtml='<div style="padding:8px 16px 12px;background:#f8fafc;border-radius:0 0 8px 8px">';
+      subHtml+='<div style="font-size:11px;font-weight:600;color:var(--gray);margin-bottom:6px">👤 Détail par manager — '+periodLabel(pk,window._periodMode)+'</div>';
+      subHtml+='<table style="width:100%;font-size:11.5px;border-collapse:collapse">';
+      subHtml+='<thead><tr style="border-bottom:1px solid var(--border)">';
+      subHtml+='<th style="text-align:left;padding:3px 6px;color:var(--gray)">BM</th>';
+      subHtml+='<th style="text-align:center;padding:3px 4px">📥 Reçus</th>';
+      subHtml+='<th style="text-align:center;padding:3px 4px">📨 Rép.</th>';
+      subHtml+='<th style="text-align:center;padding:3px 4px">🟣 Qual.</th>';
+      subHtml+='<th style="text-align:center;padding:3px 4px">🟢 Dém.</th>';
+      subHtml+='<th style="text-align:center;padding:3px 4px">⚫ Clos</th>';
+      subHtml+='</tr></thead><tbody>';
+      bmEntries.forEach(([bm,s])=>{
+        subHtml+='<tr style="border-bottom:1px solid #eee">';
+        subHtml+='<td style="padding:3px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
+        subHtml+='<td style="text-align:center;font-weight:600">'+s.recu+'</td>';
+        subHtml+='<td style="text-align:center">'+s.repondu+'</td>';
+        subHtml+='<td style="text-align:center">'+s.qualif+'</td>';
+        subHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
+        subHtml+='<td style="text-align:center;color:var(--gray)">'+s.clos+'</td>';
+        subHtml+='</tr>';
+      });
+      subHtml+='</tbody></table></div>';
+      detailRow.querySelector("td").innerHTML=subHtml;
+      detailRow.style.display="table-row";
     });
   });
 }
