@@ -918,6 +918,7 @@ function renderDetail(el, rfc) {
         <div><div class="lbl">Période</div>${ao.dateDebut} → ${ao.dateFin}</div>
         <div><div class="lbl">Durée</div><strong>${ao.nbJours} jours</strong></div>
         <div><div class="lbl">📅 Date d'ouverture</div><input type="date" id="d_dateOuverture" value="${ao.dateOuverture||ao.dateCreation||""}" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none"></div>
+        <div><div class="lbl">🔒 Date de clôture</div><input type="date" id="d_dateCloture" value="${ao.dateCloture||""}" style="padding:4px 8px;border:1px solid ${ao.dateCloture?"var(--red)":"#d1d5db"};border-radius:6px;font-size:13px;outline:none"><div style="font-size:10px;color:var(--text-light);margin-top:2px">${ao.dateCloture?"⚫ Clos — vider pour réouvrir":"Remplir pour clôturer manuellement"}</div></div>
       </div>
       <div class="form-section">
         <h4>📋 Suivi INTM</h4>
@@ -965,13 +966,15 @@ function renderDetail(el, rfc) {
     ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
     ao.notes = document.getElementById("d_notes").value.trim();
     ao.dateOuverture = document.getElementById("d_dateOuverture").value;
+    ao.dateCloture = document.getElementById("d_dateCloture").value;
+    ao.statut = ao.dateCloture ? "clos" : "ouvert";
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
     await dbPut("aos", ao);
     renderView();
   });
   document.getElementById("clear-detail").addEventListener("click",async()=>{
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
-    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";
+    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
     await dbPut("aos", ao);
     renderView();
   });
