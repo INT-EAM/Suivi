@@ -1,1332 +1,539 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>INTM — AO Manager</title>
-<style>
-:root {
-  --green: #00915a; --green-dark: #00643e; --blue: #3b82f6; --purple: #8b5cf6;
-  --amber: #f59e0b; --red: #ef4444; --gray: #64748b; --gray-light: #f1f5f9;
-  --bg: #f5f7fa; --card: #fff; --border: #e2e8f0; --text: #1a1a2e; --text-light: #94a3b8;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
-a { color: var(--green); text-decoration: none; }
-
-/* Layout */
-.app { display: flex; min-height: 100vh; }
-.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.sidebar { width: 220px; background: #0f172a; color: #fff; padding: 20px 0; flex-shrink: 0; position: fixed; height: 100vh; overflow-y: auto; }
-.sidebar-logo { padding: 0 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 16px; }
-.sidebar-logo h2 { font-size: 18px; font-weight: 700; }
-.sidebar-logo span { font-size: 11px; color: var(--text-light); }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; font-size: 13.5px; cursor: pointer; transition: background 0.12s; color: rgba(255,255,255,0.7); }
-.nav-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
-.nav-item.active { background: rgba(0,145,90,0.2); color: #fff; border-left: 3px solid var(--green); }
-.nav-item .icon { font-size: 16px; width: 22px; text-align: center; }
-.nav-badge { margin-left: auto; background: var(--green); color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
-.main { margin-left: 220px; flex: 1; padding: 24px 28px; max-width: 1200px; }
-
-/* Cards */
-.card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 16px; }
-.card-title { font-size: 14px; font-weight: 600; color: var(--gray); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-
-/* KPI Grid */
-.kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
-.kpi { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 16px; }
-.kpi-value { font-size: 32px; font-weight: 800; line-height: 1.1; }
-.kpi-label { font-size: 12px; color: var(--gray); margin-top: 4px; }
-.kpi-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
-
-/* Filters Bar */
-.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
-.filter-bar select, .filter-bar input { padding: 7px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; outline: none; background: #fff; }
-.filter-bar input[type=text] { flex: 1; min-width: 180px; }
-.filter-bar input:focus, .filter-bar select:focus { border-color: var(--green); }
-
-/* Table */
-.table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-thead tr { background: var(--gray-light); }
-th { padding: 9px 10px; text-align: left; font-weight: 600; white-space: nowrap; user-select: none; font-size: 11.5px; text-transform: uppercase; color: var(--gray); letter-spacing: 0.3px; }
-th.sortable { cursor: pointer; }
-th.sortable:hover { color: var(--green); }
-td { padding: 7px 10px; border-bottom: 1px solid #f8fafc; }
-tr.row { cursor: pointer; transition: background 0.1s; }
-tr.row:hover { background: #f8fafc !important; }
-tr.row.selected { background: #e0f2fe !important; }
-tr.urg3 { background: #fef2f2; }
-tr.urg2 { background: #fefce8; }
-tr.urg1 { background: #f0fdf4; }
-tr.clos { opacity: 0.45; }
-.rfc-code { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 11px; color: #475569; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; color: #fff; }
-.profil-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.org-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gray); font-size: 11.5px; }
-.tri-cell { font-weight: 700; color: var(--green); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
-.empty-cell { color: #d1d5db; }
-.status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
-.pill-ouvert { background: #dbeafe; color: #1d4ed8; }
-.pill-encours { background: #fef3c7; color: #92400e; }
-.pill-repondu { background: #fed7aa; color: #9a3412; }
-.pill-qualif { background: #ede9fe; color: #6d28d9; }
-.pill-demarrage { background: #d1fae5; color: #065f46; }
-.pill-clos { background: #f1f5f9; color: #94a3b8; }
-.pill-clos-traite { background: #dbeafe; color: #1e40af; }
-th.r { text-align: right; }
-td.r { text-align: right; }
-
-/* Detail Panel */
-.detail-panel { margin-top: 16px; animation: slideIn 0.15s ease; }
-@keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
-.detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-.detail-codes { font-size: 11px; color: var(--text-light); font-family: monospace; }
-.detail-panel h3 { font-size: 15px; font-weight: 700; margin-top: 4px; }
-.close-btn { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-light); }
-.close-btn:hover { color: #333; }
-.info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 20px; font-size: 13px; margin-bottom: 16px; }
-.info-grid .lbl { font-size: 11px; color: var(--text-light); margin-bottom: 2px; }
-.form-section { padding-top: 16px; border-top: 1px solid var(--border); }
-.form-section h4 { font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 12px; }
-.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
-.field { display: flex; flex-direction: column; gap: 3px; }
-.field label { font-size: 11px; color: var(--text-light); font-weight: 500; }
-.field input, .field select { padding: 7px 10px; border-radius: 7px; border: 1px solid #d1d5db; font-size: 13px; outline: none; font-family: inherit; }
-.field input:focus { border-color: var(--green); }
-.field input.tri { text-transform: uppercase; font-weight: 700; letter-spacing: 1px; }
-.form-actions { display: flex; gap: 8px; margin-top: 14px; }
-.btn { padding: 8px 16px; border-radius: 8px; border: 1px solid #d1d5db; background: #fff; font-size: 12.5px; cursor: pointer; font-weight: 500; font-family: inherit; }
-.btn:hover { background: #f8fafc; }
-.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
-.btn-green:hover { background: var(--green-dark); }
-.btn-red { color: var(--red); border-color: #fecaca; }
-.btn-red:hover { background: #fef2f2; }
-
-/* Import */
-.import-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.15s; }
-.import-zone:hover { border-color: var(--green); background: #f0fdf4; }
-.import-zone.active { border-color: var(--green); background: #d1fae5; }
-.import-zone h3 { font-size: 16px; margin-bottom: 6px; }
-.import-zone p { font-size: 13px; color: var(--gray); }
-.import-result { margin-top: 16px; padding: 16px; border-radius: 10px; font-size: 13px; }
-.import-ok { background: #d1fae5; border: 1px solid #86efac; color: #065f46; }
-.import-warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
-
-/* Charts (simple bars) */
-.bar-chart { display: flex; flex-direction: column; gap: 6px; }
-.bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
-.bar-label { width: 140px; text-align: right; color: var(--gray); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bar-track { flex: 1; height: 22px; background: var(--gray-light); border-radius: 6px; overflow: hidden; }
-.bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width 0.3s; }
-.bar-val { width: 30px; font-weight: 700; font-size: 12px; }
-
-/* Mobile menu */
-.menu-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: #0f172a; color: #fff; border: none; border-radius: 8px; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; }
-.sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; }
-
-/* Tablet */
-@media (max-width: 900px) {
-  .menu-toggle { display: flex; }
-  .sidebar { transform: translateX(-100%); transition: transform 0.25s ease; z-index: 1000; }
-  .sidebar.open { transform: translateX(0); }
-  .sidebar-overlay.open { display: block; }
-  .main { margin-left: 0; padding: 16px 14px; padding-top: 56px; max-width: 100%; }
-  .dash-grid { grid-template-columns: 1fr; }
-  .kpi-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .kpi { padding: 10px 12px; }
-  .kpi-value { font-size: 22px; }
-  .kpi-label { font-size: 10px; }
-  .info-grid, .form-grid { grid-template-columns: 1fr 1fr; }
-  .filter-bar { gap: 6px; }
-  .filter-bar select { font-size: 12px; padding: 6px 8px; }
-  .bar-label { width: 90px; font-size: 11px; }
-  table { font-size: 11.5px; }
-  th, td { padding: 6px 6px; }
-  .profil-cell { max-width: 140px; }
-  .org-cell { max-width: 100px; }
-}
-
-/* Mobile */
-@media (max-width: 600px) {
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-  .kpi-value { font-size: 20px; }
-  .info-grid, .form-grid { grid-template-columns: 1fr; }
-  .filter-bar input[type=text] { min-width: 100%; }
-  .filter-bar select { flex: 1; min-width: calc(50% - 6px); }
-  .header h1 { font-size: 18px; }
-  .header-actions { display: none; }
-  .bar-label { width: 70px; }
-  .profil-cell { max-width: 110px; font-size: 11px; }
-  .org-cell { display: none; }
-  th:nth-child(4), td:nth-child(4) { display: none; }
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTM Finance Manager</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; background: #0c0f1a; color: #e2e8f0; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #2a3158; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d4a7a; }
+    input:focus, button:focus-visible { outline: 1px solid #60a5fa; outline-offset: 2px; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    .fade-in { animation: fadeIn .35s ease both; }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+  </style>
 </head>
 <body>
-<button class="menu-toggle" id="menu-toggle">☰</button>
-<div class="sidebar-overlay" id="sidebar-overlay"></div>
-<div class="app">
-  <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <h2>INTM</h2>
-      <span>AO Manager</span>
-    </div>
-    <div class="nav-item active" data-view="dashboard"><span class="icon">📊</span> Dashboard <span class="nav-badge" id="nav-count">0</span></div>
-    <div class="nav-item" data-view="liste"><span class="icon">📋</span> Appels d'offres</div>
-    <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
-    <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
-    <div style="position:absolute;bottom:16px;left:0;right:0;padding:0 20px">
-      <div id="db-status" style="font-size:10px;padding:6px 10px;border-radius:6px;text-align:center"></div>
-    </div>
-  </nav>
+  <div id="root"></div>
 
-  <div class="main" id="main-content"></div>
-</div>
+  <script type="text/babel" data-type="module">
+    const { useState, useMemo, useCallback, useRef } = React;
+    const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } = Recharts;
 
-<script>
-// ===================== CONFIGURATION SUPABASE =====================
-// ⚠️ Remplacez par vos valeurs Supabase (Settings > API)
-const SUPABASE_URL = "https://tjlrhacczpdtgtiutjlm.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqbHJoYWNjenBkdGd0aXV0amxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzcxNTIsImV4cCI6MjA5MTI1MzE1Mn0.iBBvWvBtVHWf6s9eRb1cF9TgDqWBdl_8Bc3y6KH8lA4";
+    // ─── CONSTANTS ──────────────────────────────────────────
+    const TEAM = {
+      VBR:  { label: "Vincent B.",  color: "#3b82f6" },
+      OAK:  { label: "Omar A.",    color: "#10b981" },
+      MBNE: { label: "Mira B.",    color: "#d946ef" },
+    };
+    const TEAM_KEYS = Object.keys(TEAM);
+    const ALL = "ALL";
 
-// ===================== BASE DE DONNÉES =====================
-let memoryStore = { aos: [], imports: [] };
-const useSupabase = SUPABASE_URL && SUPABASE_KEY;
+    const COL = {
+      region:0, resp:1, collab:2, stSociete:3, client:4, clientFinal:5,
+      tjm:6, w:7, mal:8, css:9, icEntree:10, ic:11, cp:12, totalJrs:13,
+      prod:14, prodCompl:15, totalProd:16, tarifST:17, st:18, stForfait:19,
+      regulST:20, totalST:21, diffST:22, salBrut:23, fraisRef:24, fraisCompta:25,
+      ticketResto:26, autresFrais:27, rfa:28, coutConsult:29, mc1:30, mc1CA:31,
+      mc2:32, rex:33, rexCA:34, coutIC:35, adv:36, adjAdv:37, pole:38, regionCol:39,
+    };
 
-function sbHeaders(extra) {
-  return { "apikey": SUPABASE_KEY, "Authorization": "Bearer "+SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal", ...extra };
-}
+    const SHORT_M = ["","Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+    const P = {
+      bg:"#0c0f1a", card:"#141827", cardH:"#1a1f35", bdr:"#1e2540", bdrL:"#2a3158",
+      tx:"#e2e8f0", txM:"#8892b0", txD:"#4a5578",
+      acc:"#60a5fa", grn:"#34d399", red:"#f87171", pur:"#c084fc", amb:"#fbbf24",
+    };
 
-async function openDB() {
-  if(useSupabase) { console.log("Supabase connecté: "+SUPABASE_URL); return; }
-  console.warn("Supabase non configuré — mode mémoire (données non persistées)");
-}
+    // ─── UTILS ──────────────────────────────────────────────
+    const n = v => { if(v==null||v===""||v===" ") return 0; const x=typeof v==="number"?v:parseFloat(String(v).replace(",",".")); return isNaN(x)?0:x; };
+    const fmt = (v,d=0) => { if(v==null||isNaN(v)) return "–"; return new Intl.NumberFormat("fr-FR",{minimumFractionDigits:d,maximumFractionDigits:d}).format(v); };
+    const fK = v => { if(v==null||isNaN(v)) return "–"; return Math.abs(v)>=1000 ? fmt(v/1000,1)+"k" : fmt(v,0); };
+    const fP = v => { if(v==null||isNaN(v)||!isFinite(v)) return "–"; return fmt(v*100,1)+"%"; };
 
-async function dbGetAll(store) {
-  if(!useSupabase) return store==="aos"?memoryStore.aos:memoryStore.imports;
-  try {
-    const table = store==="aos"?"appels_offres":"imports";
-    const res = await fetch(SUPABASE_URL+"/rest/v1/"+table+"?select=data&order="+(store==="aos"?"updated_at":"created_at")+".desc", {headers:sbHeaders()});
-    if(!res.ok) throw new Error(res.statusText);
-    const rows = await res.json();
-    return rows.map(r=>r.data);
-  } catch(e) { console.error("Supabase GET error:", e); return store==="aos"?memoryStore.aos:memoryStore.imports; }
-}
+    // ─── PARSER ─────────────────────────────────────────────
+    function parseSheetName(name) {
+      const s = name.trim();
+      const simu = /^SIMU/i.test(s);
+      const full = /FULL/i.test(s);
+      const m = s.match(/(\d{2})[_\s]*(\d{4})/);
+      if (!m) return null;
+      // Skip recap/pivot sheets (R XX or R FULL)
+      const stripped = s.replace(/SIMU/i,"").replace(/FULL/i,"").trim();
+      if (/^\s*R\s/i.test(stripped) || /^R\s/i.test(s.replace(/SIMU\s*/i,""))) return null;
+      // Skip FULL cumulative sheets
+      if (full) return null;
+      return { name: s, month: parseInt(m[1]), year: parseInt(m[2]), simu };
+    }
 
-async function dbPut(store, data) {
-  // Memory
-  if(store==="aos"){const i=memoryStore.aos.findIndex(a=>a.rfc===data.rfc);if(i>=0)memoryStore.aos[i]=data;else memoryStore.aos.push(data);}
-  else memoryStore.imports.push(data);
-  if(!useSupabase) return;
-  // Supabase
-  try {
-    const table = store==="aos"?"appels_offres":"imports";
-    const body = store==="aos" ? {rfc:data.rfc, data:data} : {data:data};
-    await fetch(SUPABASE_URL+"/rest/v1/"+table, {
-      method:"POST", headers:sbHeaders({"Prefer":"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(body)
-    });
-  } catch(e) { console.error("Supabase PUT error:", e); }
-}
-
-async function dbPutMany(store, items) {
-  // Memory
-  if(store==="aos") items.forEach(item=>{const i=memoryStore.aos.findIndex(a=>a.rfc===item.rfc);if(i>=0)memoryStore.aos[i]=item;else memoryStore.aos.push(item);});
-  else memoryStore.imports.push(...items);
-  if(!useSupabase) return;
-  // Supabase batch upsert
-  try {
-    const table = store==="aos"?"appels_offres":"imports";
-    const body = store==="aos"
-      ? items.map(item=>({rfc:item.rfc, data:item}))
-      : items.map(item=>({data:item}));
-    await fetch(SUPABASE_URL+"/rest/v1/"+table, {
-      method:"POST", headers:sbHeaders({"Prefer":"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(body)
-    });
-  } catch(e) { console.error("Supabase PUTMANY error:", e); }
-}
-
-// ===================== PARSER =====================
-function parseAOs(raw) {
-  const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
-  const noise = ["Prestation","Dates de mission","Nombre d'UO","TJM","Code","Demande d'achats","Organisation","Département","Date limite de réponses","Statut"];
-  const aos = []; let i = 0;
-  while (i < lines.length) {
-    if (lines[i]==="btnMasterDetail" && i+1<lines.length && /^RFC\d+/.test(lines[i+1])) {
-      const rfc=lines[i+1], intitule=lines[i+2]||"";
-      let tm="",org="",dept="",statutPwise="",j=i+3;
-      while(j<lines.length&&lines[j]!=="btnMasterDetail"){
-        if(/^TM\d+/.test(lines[j]))tm=lines[j];
-        else if(/^L6T?_/.test(lines[j]))org=lines[j].replace(/^L6T?_/,"");
-        else if(lines[j].startsWith("L4_"))dept=lines[j].replace("L4_","");
-        else if(!noise.includes(lines[j])&&!lines[j].includes("Enregistrement")&&!lines[j].includes("Modifier le paramétrage"))statutPwise=lines[j];
-        j++;
+    function parseSheet(ws) {
+      const ref = ws["!ref"];
+      if (!ref) return { rows: [], jo: 0 };
+      const rng = XLSX.utils.decode_range(ref);
+      const jo = n(ws["B1"]?.v);
+      const rows = [];
+      for (let r = 2; r <= rng.e.r; r++) {
+        const g = c => { const cell = ws[XLSX.utils.encode_cell({r,c})]; return cell ? cell.v : null; };
+        const resp = g(COL.resp);
+        const collab = g(COL.collab);
+        if (!resp || !collab) continue;
+        rows.push({
+          resp: String(resp).trim(),
+          collab: String(collab).trim(),
+          stSoc: g(COL.stSociete)||"",
+          client: g(COL.client)||"",
+          cf: g(COL.clientFinal)||"",
+          tjm: n(g(COL.tjm)),
+          w: n(g(COL.w)),
+          mal: n(g(COL.mal)),
+          ic: n(g(COL.ic)),
+          cp: n(g(COL.cp)),
+          totalJrs: n(g(COL.totalJrs)),
+          prod: n(g(COL.prod)),
+          totalProd: n(g(COL.totalProd)),
+          totalST: n(g(COL.totalST)),
+          diffST: n(g(COL.diffST)),
+          salBrut: n(g(COL.salBrut)),
+          rfa: n(g(COL.rfa)),
+          coutCons: n(g(COL.coutConsult)),
+          mc1: n(g(COL.mc1)),
+          mc1CA: n(g(COL.mc1CA)),
+          mc2: n(g(COL.mc2)),
+          rex: n(g(COL.rex)),
+          rexCA: n(g(COL.rexCA)),
+          coutIC: n(g(COL.coutIC)),
+        });
       }
-      let profil="",modalite="",dateDebut="",dateFin="",nbJours=0;
-      if(j<lines.length&&lines[j]==="btnMasterDetail"){
-        j++;if(j<lines.length){profil=lines[j];j++;}
-        while(j<lines.length&&lines[j]!=="btnMasterDetail"){
-          if(["Sur Site","Télétravail","Hybride"].includes(lines[j]))modalite=lines[j];
-          const dm=lines[j].match(/^(\d{2}\/\d{2}\/\d{4})\s*-\s*(\d{2}\/\d{2}\/\d{4})$/);
-          if(dm){dateDebut=dm[1];dateFin=dm[2];}
-          const nm=lines[j].match(/^(\d+)[,.](\d+)$/);
-          if(nm)nbJours=parseInt(nm[1]);
-          j++;
+      return { rows, jo };
+    }
+
+    function parseWorkbook(wb) {
+      const out = [];
+      for (const name of wb.SheetNames) {
+        const info = parseSheetName(name);
+        if (!info) continue;
+        const { rows, jo } = parseSheet(wb.Sheets[name]);
+        if (rows.length === 0) continue;
+        out.push({ ...info, rows, jo });
+      }
+      out.sort((a,b) => a.year-b.year || a.month-b.month);
+      return out;
+    }
+
+    // ─── KPI ENGINE ─────────────────────────────────────────
+    function kpi(rows, jo, bm) {
+      const f = bm===ALL ? rows.filter(r=>TEAM_KEYS.includes(r.resp)) : rows.filter(r=>r.resp===bm);
+      const mission = f.filter(r=>r.tjm>0 && r.cf && !["IC","MALADIE",""].includes(r.cf.trim()));
+      const totalProd = f.reduce((s,r)=>s+r.totalProd,0);
+      const totalST  = f.reduce((s,r)=>s+r.totalST,0);
+      const mc1 = f.reduce((s,r)=>s+r.mc1,0);
+      const mc2 = f.reduce((s,r)=>s+r.mc2,0);
+      const rex = f.reduce((s,r)=>s+r.rex,0);
+      const wTot = f.reduce((s,r)=>s+r.w,0);
+      const jrsPoss = mission.length * jo;
+      const taux = jrsPoss>0 ? wTot/jrsPoss : 0;
+      const tjmMoy = wTot>0 ? totalProd/wTot : 0;
+      const collabs = new Set(f.map(r=>r.collab)).size;
+      const enMission = new Set(mission.map(r=>r.collab)).size;
+      const icCount = new Set(f.filter(r=>!r.cf||r.cf==="IC"||r.cf==="MALADIE"||r.tjm===0).map(r=>r.collab)).size;
+      return { totalProd, totalST, mc1, mc2, rex, wTot, taux, tjmMoy, collabs, enMission, icCount, mc1R: totalProd?mc1/totalProd:0, rexR: totalProd?rex/totalProd:0, data: f };
+    }
+
+    // ─── SUB-COMPONENTS ─────────────────────────────────────
+
+    function KCard({ label, value, sub, color, delay }) {
+      return React.createElement("div", {
+        className: "fade-in",
+        style: {
+          background: P.card, border: `1px solid ${P.bdr}`, borderRadius: 12,
+          padding: "18px 20px", position: "relative", overflow: "hidden",
+          cursor: "default", animationDelay: delay||"0s", transition: "border-color .2s, transform .2s",
+        },
+        onMouseEnter: e => { e.currentTarget.style.borderColor = color||P.acc; e.currentTarget.style.transform = "translateY(-2px)"; },
+        onMouseLeave: e => { e.currentTarget.style.borderColor = P.bdr; e.currentTarget.style.transform = "none"; },
+      },
+        React.createElement("div", { style: { position:"absolute", top:0, left:0, right:0, height:3, background:color||P.acc, opacity:.7 } }),
+        React.createElement("div", { style: { fontSize:11, color:P.txM, textTransform:"uppercase", letterSpacing:1.2, marginBottom:8, fontWeight:600 } }, label),
+        React.createElement("div", { style: { fontSize:26, fontWeight:700, color:P.tx, letterSpacing:-.5, fontVariantNumeric:"tabular-nums" } }, value),
+        sub && React.createElement("div", { style: { fontSize:12, color:P.txM, marginTop:4 } }, sub),
+      );
+    }
+
+    function BmToggle({ sel, onChange }) {
+      const opts = [{ k:ALL, l:"Équipe" }, ...TEAM_KEYS.map(k=>({ k, l:k }))];
+      return React.createElement("div", { style: { display:"flex", gap:4, background:P.card, borderRadius:10, padding:4, border:`1px solid ${P.bdr}` } },
+        opts.map(o => {
+          const act = sel===o.k;
+          const col = o.k===ALL ? P.acc : TEAM[o.k]?.color||P.acc;
+          return React.createElement("button", {
+            key: o.k, onClick: ()=>onChange(o.k),
+            style: {
+              padding:"8px 16px", borderRadius:8, border:"none", cursor:"pointer",
+              fontSize:13, fontWeight:600, letterSpacing:.3, transition:"all .15s",
+              background: act?col:"transparent", color: act?"#fff":P.txM,
+            }
+          }, o.l);
+        })
+      );
+    }
+
+    function MonthTabs({ months, sel, onChange }) {
+      return React.createElement("div", { style: { display:"flex", gap:4, flexWrap:"wrap" } },
+        months.map((m,i) => {
+          const act = sel===i;
+          const lbl = `${m.simu?"⚡ ":""}${SHORT_M[m.month]} ${m.year}`;
+          return React.createElement("button", {
+            key: i, onClick: ()=>onChange(i),
+            style: {
+              padding:"7px 16px", borderRadius:8, border:`1px solid ${act?P.acc:P.bdr}`,
+              cursor:"pointer", fontSize:12, fontWeight:600, transition:"all .15s",
+              background: act?P.acc+"22":"transparent", color: act?P.acc:P.txM,
+            }
+          }, lbl);
+        })
+      );
+    }
+
+    function Trend({ months, bm }) {
+      const data = months.map(m => {
+        const k = kpi(m.rows, m.jo, bm);
+        return { label: `${m.simu?"~":""}${SHORT_M[m.month]}`, prod:k.totalProd, rex:k.rex };
+      });
+      return React.createElement("div", { className:"fade-in", style: { background:P.card, borderRadius:12, padding:20, border:`1px solid ${P.bdr}` } },
+        React.createElement("div", { style: { fontSize:12, fontWeight:600, color:P.txM, textTransform:"uppercase", letterSpacing:1, marginBottom:16 } }, "Évolution mensuelle"),
+        React.createElement(ResponsiveContainer, { width:"100%", height:260 },
+          React.createElement(BarChart, { data, barGap:2 },
+            React.createElement(CartesianGrid, { strokeDasharray:"3 3", stroke:P.bdr }),
+            React.createElement(XAxis, { dataKey:"label", tick:{fill:P.txM,fontSize:12}, axisLine:{stroke:P.bdr} }),
+            React.createElement(YAxis, { tick:{fill:P.txM,fontSize:11}, axisLine:false, tickFormatter:fK }),
+            React.createElement(Tooltip, { contentStyle:{background:P.card,border:`1px solid ${P.bdr}`,borderRadius:8,color:P.tx,fontSize:12}, formatter:(v,nm)=>[fmt(v)+"€",nm] }),
+            React.createElement(Legend, { wrapperStyle:{fontSize:11,color:P.txM} }),
+            React.createElement(Bar, { dataKey:"prod", name:"Production", fill:P.acc, radius:[4,4,0,0] }),
+            React.createElement(Bar, { dataKey:"rex", name:"REX", fill:P.grn, radius:[4,4,0,0] }),
+          )
+        )
+      );
+    }
+
+    function BmCompare({ rows, jo }) {
+      const data = TEAM_KEYS.map(bm => ({ bm, ...kpi(rows, jo, bm) }));
+      return React.createElement("div", { className:"fade-in", style: { background:P.card, borderRadius:12, padding:20, border:`1px solid ${P.bdr}` } },
+        React.createElement("div", { style: { fontSize:12, fontWeight:600, color:P.txM, textTransform:"uppercase", letterSpacing:1, marginBottom:16 } }, "Comparaison BM"),
+        React.createElement("div", { style: { display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:14 } },
+          data.map(d => React.createElement("div", {
+            key: d.bm,
+            style: { padding:16, borderRadius:10, border:`1px solid ${TEAM[d.bm].color}33`, background:TEAM[d.bm].color+"08" }
+          },
+            React.createElement("div", { style: { display:"flex", alignItems:"center", gap:8, marginBottom:12 } },
+              React.createElement("div", { style: { width:10, height:10, borderRadius:"50%", background:TEAM[d.bm].color } }),
+              React.createElement("span", { style: { fontSize:15, fontWeight:700, color:P.tx } }, d.bm),
+              React.createElement("span", { style: { fontSize:11, color:P.txM } }, TEAM[d.bm].label),
+            ),
+            React.createElement("div", { style: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, fontSize:12 } },
+              ...[
+                ["Consultants", `${d.collabs}`, `${d.enMission} mission · ${d.icCount} IC`],
+                ["Production", fK(d.totalProd)+"€", `TJM ${fmt(d.tjmMoy)}€`],
+                ["REX", fK(d.rex)+"€", `REX/CA ${fP(d.rexR)}`],
+                ["Occupation", fP(d.taux), `${fmt(d.wTot,0)} jrs travaillés`],
+              ].map(([lbl,val,sub],i) => React.createElement("div", { key:i },
+                React.createElement("span", { style:{color:P.txM} }, lbl),
+                React.createElement("br"),
+                React.createElement("b", { style:{color: lbl==="REX"?(d.rex>=0?P.grn:P.red) : lbl==="Occupation"?(d.taux>=.85?P.grn:P.amb) : P.tx} }, val),
+                sub && React.createElement("div", { style:{fontSize:10,color:P.txD,marginTop:2} }, sub),
+              ))
+            )
+          ))
+        )
+      );
+    }
+
+    function TopClients({ data }) {
+      const map = {};
+      data.forEach(r => {
+        if (!r.cf || r.cf==="IC" || r.cf==="MALADIE") return;
+        const k = r.cf.trim();
+        if (!map[k]) map[k] = { cf:k, prod:0, n:0 };
+        map[k].prod += r.totalProd;
+        map[k].n += 1;
+      });
+      const top = Object.values(map).sort((a,b)=>b.prod-a.prod).slice(0,8);
+      const colors = [P.acc,P.grn,P.pur,P.amb,"#f87171","#38bdf8","#a78bfa","#fb923c"];
+      const max = top[0]?.prod||1;
+
+      return React.createElement("div", { className:"fade-in", style: { background:P.card, borderRadius:12, padding:20, border:`1px solid ${P.bdr}` } },
+        React.createElement("div", { style: { fontSize:12, fontWeight:600, color:P.txM, textTransform:"uppercase", letterSpacing:1, marginBottom:16 } }, "Top clients (production)"),
+        React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:8 } },
+          top.map((c,i) => React.createElement("div", { key:c.cf, style: { display:"flex", alignItems:"center", gap:10 } },
+            React.createElement("div", { style: { width:130, fontSize:12, color:P.tx, fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }, title:c.cf }, c.cf),
+            React.createElement("div", { style: { flex:1, height:20, background:P.bdr+"44", borderRadius:4, overflow:"hidden" } },
+              React.createElement("div", { style: { height:"100%", width:`${(c.prod/max)*100}%`, background:colors[i%8], borderRadius:4, opacity:.7, transition:"width .5s" } })
+            ),
+            React.createElement("div", { style: { fontSize:12, fontWeight:600, color:P.tx, width:65, textAlign:"right", fontVariantNumeric:"tabular-nums" } }, fK(c.prod)+"€"),
+            React.createElement("div", { style: { fontSize:10, color:P.txM, width:20, textAlign:"right" } }, c.n),
+          ))
+        )
+      );
+    }
+
+    function Alerts({ data, jo }) {
+      const alerts = [];
+      data.forEach(r => {
+        if (r.tjm>0 && r.w===0 && r.mal===0 && r.ic===0 && r.cp===0)
+          alerts.push({ t:"warn", m:`${r.collab} — 0 jour travaillé (TJM ${fmt(r.tjm)}€)` });
+        if (r.totalProd < 0)
+          alerts.push({ t:"err", m:`${r.collab} — Prod. négative (${fmt(r.totalProd)}€)` });
+        if (r.rex < -2000)
+          alerts.push({ t:"err", m:`${r.collab} — REX critique (${fmt(r.rex)}€)` });
+      });
+      if (!alerts.length) return null;
+      const col = { err:P.red, warn:P.amb, info:P.acc };
+      return React.createElement("div", { className:"fade-in", style: { background:P.card, borderRadius:12, padding:20, border:`1px solid ${P.bdr}` } },
+        React.createElement("div", { style: { fontSize:12, fontWeight:600, color:P.txM, textTransform:"uppercase", letterSpacing:1, marginBottom:12 } }, `⚠ Alertes (${alerts.length})`),
+        React.createElement("div", { style: { display:"flex", flexDirection:"column", gap:6, maxHeight:220, overflowY:"auto" } },
+          alerts.slice(0,20).map((a,i) => React.createElement("div", {
+            key:i, style: { fontSize:12, padding:"6px 10px", borderRadius:6, borderLeft:`3px solid ${col[a.t]}`, background:col[a.t]+"0a", color:P.tx }
+          }, a.m))
+        )
+      );
+    }
+
+    function Table({ data, jo }) {
+      const [sort, setSort] = useState("totalProd");
+      const [asc, setAsc] = useState(false);
+      const [q, setQ] = useState("");
+
+      const sorted = useMemo(() => {
+        let arr = [...data];
+        if (q) { const s=q.toLowerCase(); arr=arr.filter(r=>r.collab.toLowerCase().includes(s)||r.cf.toLowerCase().includes(s)||r.resp.toLowerCase().includes(s)); }
+        arr.sort((a,b) => {
+          let va=a[sort], vb=b[sort];
+          if (typeof va==="string") return asc?va.localeCompare(vb):vb.localeCompare(va);
+          return asc?va-vb:vb-va;
+        });
+        return arr;
+      }, [data,sort,asc,q]);
+
+      const doSort = k => { if(sort===k) setAsc(!asc); else { setSort(k); setAsc(false); } };
+
+      const TH = (key,label,right) => React.createElement("th", {
+        onClick:()=>doSort(key),
+        style: {
+          padding:"10px 12px", textAlign:right?"right":"left", fontSize:11, color:P.txM,
+          textTransform:"uppercase", letterSpacing:1, cursor:"pointer", userSelect:"none",
+          borderBottom:`1px solid ${P.bdr}`, whiteSpace:"nowrap",
+          background: sort===key?P.bdr+"44":"transparent",
         }
+      }, label, sort===key ? (asc?" ↑":" ↓") : "");
+
+      const td = (right) => ({
+        padding:"10px 12px", fontSize:13, borderBottom:`1px solid ${P.bdr}22`,
+        textAlign:right?"right":"left", fontVariantNumeric: right?"tabular-nums":"normal",
+      });
+
+      return React.createElement("div", { className:"fade-in" },
+        React.createElement("div", { style:{marginBottom:12} },
+          React.createElement("input", {
+            type:"text", placeholder:"Rechercher consultant, client…", value:q,
+            onChange: e=>setQ(e.target.value),
+            style: { width:"100%", maxWidth:340, padding:"10px 14px", borderRadius:8, border:`1px solid ${P.bdr}`, background:P.card, color:P.tx, fontSize:13 },
+            onFocus: e=>e.target.style.borderColor=P.acc, onBlur: e=>e.target.style.borderColor=P.bdr,
+          })
+        ),
+        React.createElement("div", { style:{overflowX:"auto", borderRadius:10, border:`1px solid ${P.bdr}`} },
+          React.createElement("table", { style:{width:"100%", borderCollapse:"collapse", minWidth:950} },
+            React.createElement("thead", null,
+              React.createElement("tr", { style:{background:P.card} },
+                TH("resp","BM"), TH("collab","Consultant"), TH("cf","Client Final"),
+                TH("tjm","TJM",1), TH("w","Jrs W",1), TH("totalProd","Prod.",1),
+                TH("totalST","Coût ST",1), TH("mc1","MC1",1), TH("rex","REX",1),
+                React.createElement("th", { style:{...td(true), fontSize:11, color:P.txM, textTransform:"uppercase", letterSpacing:1, borderBottom:`1px solid ${P.bdr}`} }, "Taux"),
+              )
+            ),
+            React.createElement("tbody", null,
+              sorted.map((r,i) => {
+                const taux = jo>0 && r.tjm>0 ? r.w/jo : null;
+                const isIC = r.cf==="IC"||r.cf==="MALADIE"||r.tjm===0;
+                return React.createElement("tr", {
+                  key:i,
+                  style: { background: i%2===0?"transparent":P.card+"66", transition:"background .1s" },
+                  onMouseEnter: e=>e.currentTarget.style.background=P.cardH,
+                  onMouseLeave: e=>e.currentTarget.style.background=i%2===0?"transparent":P.card+"66",
+                },
+                  React.createElement("td", { style:td() },
+                    React.createElement("span", { style:{display:"inline-block",padding:"2px 8px",borderRadius:4,fontSize:11,fontWeight:700, background:(TEAM[r.resp]?.color||"#666")+"22", color:TEAM[r.resp]?.color||"#999"} }, r.resp)
+                  ),
+                  React.createElement("td", { style:{...td(), fontWeight:600, color:isIC?P.txM:P.tx} }, r.collab),
+                  React.createElement("td", { style:{...td(), color:isIC?P.red:P.tx} }, isIC ? React.createElement("em",null,r.cf||"IC") : r.cf),
+                  React.createElement("td", { style:td(true) }, r.tjm>0?fmt(r.tjm)+"€":"–"),
+                  React.createElement("td", { style:td(true) }, r.w>0?fmt(r.w,1):"–"),
+                  React.createElement("td", { style:{...td(true), fontWeight:600, color:r.totalProd<0?P.red:P.tx} }, r.totalProd!==0?fmt(r.totalProd)+"€":"–"),
+                  React.createElement("td", { style:{...td(true), color:P.txM} }, r.totalST>0?fmt(r.totalST)+"€":"–"),
+                  React.createElement("td", { style:{...td(true), color:r.mc1<0?P.red:r.mc1>0?P.grn:P.txM} }, r.mc1!==0?fmt(r.mc1)+"€":"–"),
+                  React.createElement("td", { style:{...td(true), fontWeight:600, color:r.rex<0?P.red:r.rex>0?P.grn:P.txM} }, r.rex!==0?fmt(r.rex)+"€":"–"),
+                  React.createElement("td", { style:td(true) },
+                    taux!=null ? React.createElement("span", { style:{padding:"2px 8px",borderRadius:4,fontSize:12,fontWeight:600, background:(taux>=.9?P.grn:taux>=.7?P.amb:P.red)+"22", color:taux>=.9?P.grn:taux>=.7?P.amb:P.red} }, fP(taux)) : "–"
+                  ),
+                );
+              })
+            )
+          )
+        ),
+        React.createElement("div", { style:{marginTop:8,fontSize:11,color:P.txD} }, `${sorted.length} lignes`)
+      );
+    }
+
+    // ─── MAIN APP ───────────────────────────────────────────
+    function App() {
+      const [months, setMonths] = useState(null);
+      const [selM, setSelM] = useState(0);
+      const [bm, setBm] = useState(ALL);
+      const [view, setView] = useState("dash");
+      const [drag, setDrag] = useState(false);
+      const [fname, setFname] = useState("");
+      const [loading, setLoading] = useState(false);
+
+      const load = useCallback(async file => {
+        setLoading(true);
+        try {
+          const buf = await file.arrayBuffer();
+          const wb = XLSX.read(buf, { type:"array" });
+          const parsed = parseWorkbook(wb);
+          if (parsed.length) { setMonths(parsed); setSelM(parsed.length-1); setFname(file.name); }
+        } catch(e) { console.error(e); }
+        setLoading(false);
+      }, []);
+
+      const cur = months?.[selM];
+      const k = cur ? kpi(cur.rows, cur.jo, bm) : null;
+
+      // ─ Upload screen
+      if (!months) {
+        return React.createElement("div", {
+          style: { minHeight:"100vh", background:P.bg, display:"flex", alignItems:"center", justifyContent:"center" }
+        },
+          React.createElement("div", {
+            onDragOver: e=>{e.preventDefault();setDrag(true)},
+            onDragLeave: ()=>setDrag(false),
+            onDrop: e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer?.files?.[0];if(f)load(f)},
+            style: {
+              width:"90%", maxWidth:520, padding:48, borderRadius:20, textAlign:"center",
+              background:P.card, border:`2px dashed ${drag?P.acc:P.bdr}`,
+              transition:"all .3s", transform:drag?"scale(1.02)":"none",
+            }
+          },
+            React.createElement("div", { style:{fontSize:56,marginBottom:16} }, "📊"),
+            React.createElement("div", { style:{fontSize:24,fontWeight:700,marginBottom:8,letterSpacing:-.5} }, "INTM Finance Manager"),
+            React.createElement("div", { style:{fontSize:14,color:P.txM,marginBottom:28,lineHeight:1.6} },
+              "Importez votre fichier ", React.createElement("b",null,"COEF2"), " pour visualiser", React.createElement("br"),
+              "les KPIs financiers de votre équipe"
+            ),
+            loading
+              ? React.createElement("div", { className:"pulse", style:{color:P.acc,fontSize:14} }, "Chargement en cours…")
+              : React.createElement(React.Fragment, null,
+                  React.createElement("label", {
+                    style: { display:"inline-flex", alignItems:"center", gap:8, padding:"14px 32px", borderRadius:10, background:P.acc, color:"#fff", cursor:"pointer", fontWeight:600, fontSize:14, transition:"opacity .2s" },
+                    onMouseEnter: e=>e.currentTarget.style.opacity=.85, onMouseLeave: e=>e.currentTarget.style.opacity=1,
+                  },
+                    "📁 Choisir le fichier COEF2",
+                    React.createElement("input", { type:"file", accept:".xlsx,.xls", hidden:true, onChange:e=>{const f=e.target.files?.[0];if(f)load(f)} })
+                  ),
+                  React.createElement("div", { style:{fontSize:12,color:P.txD,marginTop:16} }, "ou glissez-déposez le fichier ici")
+                )
+          )
+        );
       }
-      if(rfc)aos.push({rfc,tm,intitule,org,dept,statutPwise,profil,modalite,dateDebut,dateFin,nbJours});
-      i=j;
-    } else i++;
-  }
-  return aos;
-}
 
-// ===================== HELPERS =====================
-function categorize(p) {
-  const l=(p||"").toLowerCase();
-  if(/développeur|software|cobol|intégrateur/.test(l)) return "Dev";
-  if(/business analyst|chargé de mission|consultant fonctionnel|analyse de test/.test(l)) return "BA";
-  if(/chef de projet|project manager/.test(l)) return "CdP";
-  if(/expert technique|tech lead/.test(l)) return "Expert";
-  return "Autre";
-}
-const CAT_COLORS={Dev:"#3b82f6",BA:"#8b5cf6",CdP:"#f59e0b",Expert:"#ef4444",Autre:"#6b7280"};
-
-function parseDate(d){if(!d)return null;const p=d.split("/");if(p.length===3)return new Date(p[2],p[1]-1,p[0]);return new Date(d);}
-function toISO(d){if(!d)return"";const dt=parseDate(d);if(!dt||isNaN(dt))return"";return dt.toISOString().slice(0,10);}
-function fromISO(s){if(!s)return"";const[y,m,d]=s.split("-");return`${d}/${m}/${y}`;}
-function urgency(d){const dt=parseDate(d);if(!dt)return 0;const diff=(dt-new Date())/86400000;if(diff<0)return 3;if(diff<=7)return 2;if(diff<=21)return 1;return 0;}
-function shortOrg(o){return(o||"").replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,28);}
-function domainGroup(o){const s=(o||"").replace(/^BCEF (IT|RETAIL) - /,"").trim();const m=s.match(/^([A-Z0-9]{2,})/);return m?m[1]:s.split(" ")[0]||"Autre";}
-
-function statutSuivi(ao) {
-  if(ao.dateDemarrage) return "demarrage";
-  if(ao.dateQualif) return "qualif";
-  if(ao.dateReponse) return "repondu";
-  if(ao.bm || ao.datePrise) return "encours";
-  return "ouvert";
-}
-function statutComplet(ao) {
-  if(ao.statut==="clos") {
-    const s=statutSuivi(ao);
-    return s==="ouvert" ? "clos_nontraite" : "clos_traite";
-  }
-  return statutSuivi(ao);
-}
-function hasTraitement(ao) { return !!(ao.bm||ao.datePrise||ao.dateReponse||ao.dateQualif||ao.dateDemarrage); }
-function statutLabel(s) {
-  return {ouvert:"Ouvert",encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré",clos:"Clos",clos_nontraite:"Clos sans traitement",clos_traite:"Clos traité"}[s]||s;
-}
-function statutPill(s, ao) {
-  if(s==="clos_traite" && ao) {
-    const inner=statutSuivi(ao);
-    const innerLabel={encours:"En cours",repondu:"Répondu",qualif:"Qualifié",demarrage:"Démarré"}[inner]||inner;
-    return '<span class="status-pill pill-clos-traite">Clos · '+innerLabel+'</span>';
-  }
-  const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-repondu",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos",clos_nontraite:"pill-clos",clos_traite:"pill-clos-traite"}[s]||"pill-ouvert";
-  return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>';
-}
-
-function today(){return new Date().toISOString().slice(0,10);}
-
-function periodKey(dateStr, mode) {
-  const d = dateStr ? (dateStr.includes("/") ? parseDate(dateStr) : new Date(dateStr)) : null;
-  if(!d || isNaN(d)) return null;
-  const y=d.getFullYear(), m=d.getMonth(), day=d.getDate();
-  if(mode==="week") {
-    const jan1=new Date(y,0,1); const days=Math.floor((d-jan1)/86400000);
-    const w=Math.ceil((days+jan1.getDay()+1)/7);
-    return y+"-S"+String(w).padStart(2,"0");
-  }
-  if(mode==="month") return y+"-"+String(m+1).padStart(2,"0");
-  if(mode==="quarter") return y+"-T"+Math.ceil((m+1)/3);
-  if(mode==="semester") return y+"-S"+(m<6?"1":"2");
-  if(mode==="year") return ""+y;
-  return y+"-"+String(m+1).padStart(2,"0");
-}
-
-function periodLabel(key, mode) {
-  if(!key) return "—";
-  if(mode==="week") { const [y,w]=key.split("-S"); return "Sem. "+parseInt(w)+" "+y; }
-  if(mode==="month") { const [y,m]=key.split("-"); const mois=["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"]; return mois[parseInt(m)-1]+" "+y; }
-  if(mode==="quarter") return key.replace("-T"," T");
-  if(mode==="semester") return key.replace("-S"," Sem. ");
-  return key;
-}
-
-function periodFilter(dateStr, period) {
-  if(!period||period==="all") return true;
-  const d = parseDate(dateStr);
-  if(!d) return true;
-  const now = new Date();
-  if(period==="week") { const w=new Date(now); w.setDate(w.getDate()-7); return d>=w; }
-  if(period==="month") { const m=new Date(now); m.setMonth(m.getMonth()-1); return d>=m; }
-  if(period==="quarter") { const q=new Date(now); q.setMonth(q.getMonth()-3); return d>=q; }
-  if(period==="year") { const y=new Date(now); y.setFullYear(y.getFullYear()-1); return d>=y; }
-  return true;
-}
-
-// ===================== STATE =====================
-let allAOs = [];
-let currentView = "dashboard";
-let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
-let sort = { col:"dateDebut", dir:1 };
-let selectedRFC = null;
-
-async function loadAOs() { allAOs = await dbGetAll("aos"); }
-
-function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
-function getFilteredAOs() {
-  let f = allAOs;
-  if(filters.statut==="clos_nontraite") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
-  else if(filters.statut==="clos_traite") f=f.filter(a=>a.statut==="clos"&&hasTraitement(a));
-  else if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
-  else if(filters.statut==="tous_clos") { /* all, no filter */ }
-  else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
-  else { /* Tous = show all including clos */ }
-  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||""].some(v=>(v||"").toLowerCase().includes(s)));}
-  if(filters.dept!=="Tous") f=f.filter(a=>a.dept===filters.dept);
-  if(filters.cat!=="Tous") f=f.filter(a=>categorize(a.profil)===filters.cat);
-  if(filters.bm!=="Tous") f=f.filter(a=>(a.bm||"")===(filters.bm==="—"?"":filters.bm));
-  if(filters.period!=="all") f=f.filter(a=>periodFilter(a.dateDebut,filters.period));
-  f=[...f].sort((a,b)=>{
-    if(sort.col==="dateDebut") return sort.dir*((parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0));
-    if(sort.col==="nbJours") return sort.dir*(a.nbJours-b.nbJours);
-    if(sort.col==="rfc") return sort.dir*a.rfc.localeCompare(b.rfc);
-    return 0;
-  });
-  return f;
-}
-
-// ===================== NAVIGATION =====================
-function navigate(view) {
-  currentView = view;
-  selectedRFC = null;
-  if(view==="dashboard") dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"};
-  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
-  renderView();
-}
-
-async function renderView() {
-  try {
-    await loadAOs();
-    document.getElementById("nav-count").textContent = getOpenAOs().length;
-    const main = document.getElementById("main-content");
-    if(currentView==="dashboard") renderDashboard(main);
-    else if(currentView==="liste") renderListe(main);
-    else if(currentView==="import") renderImport(main);
-    else if(currentView==="export") renderExport(main);
-  } catch(e) {
-    document.getElementById("main-content").innerHTML='<div style="padding:40px;color:red;font-size:14px"><h2>Erreur rendu ('+currentView+')</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
-  }
-}
-
-// ===================== DASHBOARD =====================
-// Dashboard filter state
-let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null, periodView:"month" };
-
-function dashFilteredAOs() {
-  let f = (dashF.suivi==="tous_clos"||dashF.suivi==="clos_nt"||dashF.suivi==="clos_t") ? [...allAOs] : getOpenAOs();
-  if(dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
-  if(dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
-  if(dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
-  if(dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
-  if(dashF.suivi) {
-    if(dashF.suivi==="tous_clos") { /* include all */ }
-    else if(dashF.suivi==="clos_nt") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
-    else if(dashF.suivi==="clos_t") f=f.filter(a=>a.statut==="clos"&&hasTraitement(a));
-    else if(dashF.suivi==="ouvert") f=f.filter(a=>!a.bm);
-    else if(dashF.suivi==="encours") f=f.filter(a=>a.bm&&!a.dateReponse);
-    else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse&&!a.dateQualif);
-    else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif&&!a.dateDemarrage);
-    else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
-  }
-  return f;
-}
-
-function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat||dashF.suivi; }
-
-function renderDashboard(el) {
-  const all = getOpenAOs();
-  const filtered = dashFilteredAOs();
-  const total=filtered.length;
-  const encours=filtered.filter(a=>["encours","repondu"].includes(statutSuivi(a))).length;
-  const qualif=filtered.filter(a=>statutSuivi(a)==="qualif").length;
-  const demarrage=filtered.filter(a=>statutSuivi(a)==="demarrage").length;
-  const nonTraite=filtered.filter(a=>statutSuivi(a)==="ouvert").length;
-  const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
-
-  // Compute data for each chart based on OTHER filters (exclude own dimension)
-  function subFilter(exclude) {
-    let f=all;
-    if(exclude!=="dept" && dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
-    if(exclude!=="domain" && dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
-    if(exclude!=="bm" && dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
-    if(exclude!=="cat" && dashF.cat) f=f.filter(a=>categorize(a.profil)===dashF.cat);
-    if(exclude!=="suivi" && dashF.suivi) {
-      if(dashF.suivi==="tous_clos"||dashF.suivi==="clos_nt"||dashF.suivi==="clos_t") { /* no filter on open/clos */ }
-      else if(dashF.suivi==="ouvert") f=f.filter(a=>!a.bm);
-      else if(dashF.suivi==="encours") f=f.filter(a=>a.bm&&!a.dateReponse);
-      else if(dashF.suivi==="repondu") f=f.filter(a=>a.dateReponse&&!a.dateQualif);
-      else if(dashF.suivi==="qualif") f=f.filter(a=>a.dateQualif&&!a.dateDemarrage);
-      else if(dashF.suivi==="demarrage") f=f.filter(a=>a.dateDemarrage);
-    }
-    return f;
-  }
-
-  // Départements (+ domaines en drilldown)
-  const deptData = subFilter("dept");
-  const byDept={}; deptData.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
-  const deptEntries=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
-  const maxDept=deptEntries.length?deptEntries[0][1]:1;
-
-  // Domaines (si un dept est sélectionné)
-  let domainEntries=[], maxDomain=1;
-  if(dashF.dept) {
-    const domData=subFilter("domain").filter(a=>a.dept===dashF.dept);
-    const byDom={}; domData.forEach(a=>{const g=domainGroup(a.org);byDom[g]=(byDom[g]||0)+1;});
-    domainEntries=Object.entries(byDom).sort((a,b)=>b[1]-a[1]);
-    maxDomain=domainEntries.length?domainEntries[0][1]:1;
-  }
-
-  // Managers
-  const bmData=subFilter("bm");
-  const byBM={}; bmData.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
-  const bmEntries=Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
-  const maxBM=bmEntries.length?bmEntries[0][1]:1;
-
-  // Catégories
-  const catData=subFilter("cat");
-  const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
-
-  // Build funnel HTML — exclusive categories (each AO counts once)
-  // Total reçu includes clos
-  const fClosNT=allAOs.filter(a=>{
-    if(a.statut!=="clos"||hasTraitement(a)) return false;
-    if(dashF.dept&&a.dept!==dashF.dept) return false;
-    if(dashF.domain&&domainGroup(a.org)!==dashF.domain) return false;
-    if(dashF.bm&&(a.bm||"Non assigné")!==dashF.bm) return false;
-    if(dashF.cat&&categorize(a.profil)!==dashF.cat) return false;
-    return true;
-  }).length;
-  const fClosT=allAOs.filter(a=>{
-    if(a.statut!=="clos"||!hasTraitement(a)) return false;
-    if(dashF.dept&&a.dept!==dashF.dept) return false;
-    if(dashF.domain&&domainGroup(a.org)!==dashF.domain) return false;
-    if(dashF.bm&&(a.bm||"Non assigné")!==dashF.bm) return false;
-    if(dashF.cat&&categorize(a.profil)!==dashF.cat) return false;
-    return true;
-  }).length;
-  // Exclusive open counts
-  const fDem=filtered.filter(a=>a.dateDemarrage).length;
-  const fQualifOnly=filtered.filter(a=>a.dateQualif&&!a.dateDemarrage).length;
-  const fReponduOnly=filtered.filter(a=>a.dateReponse&&!a.dateQualif).length;
-  const fAttenteRep=filtered.filter(a=>a.bm&&!a.dateReponse).length;
-  const fNonAttrib=filtered.filter(a=>!a.bm).length;
-  const totalRecu=fClosNT+fClosT+total;
-
-  const fSteps=[
-    {label:"Total reçu",n:totalRecu,color:"#475569",key:null,bold:true},
-    {label:"Clos sans trait.",n:fClosNT,color:"#94a3b8",key:"clos_nt",indent:true},
-    {label:"Clos traités",n:fClosT,color:"#1e40af",key:"clos_t",indent:true},
-    {label:"Non attribués",n:fNonAttrib,color:"#60a5fa",key:"ouvert",indent:true},
-    {label:"En attente rép.",n:fAttenteRep,color:"var(--amber)",key:"encours",indent:true},
-    {label:"Répondus",n:fReponduOnly,color:"#ea580c",key:"repondu",indent:true},
-    {label:"Qualifiés",n:fQualifOnly,color:"var(--purple)",key:"qualif",indent:true},
-    {label:"Démarrés",n:fDem,color:"var(--green)",key:"demarrage",indent:true}
-  ];
-  const fMax=Math.max(totalRecu,1);
-  let funnelHtml='<div style="display:flex;flex-direction:column;gap:3px">';
-  fSteps.forEach((s,i)=>{
-    const pct=Math.max(Math.round(s.n/fMax*100),s.n>0?4:0);
-    const sel=s.key&&dashF.suivi===s.key;
-    const clickable=!!s.key;
-    funnelHtml+='<div class="bar-row'+(clickable?' dash-click':'')+'" '+(clickable?'data-key="suivi" data-val="'+s.key+'"':'')+' style="'+(clickable?"cursor:pointer;":"")+(sel?"outline:2px solid '+s.color+';border-radius:6px;":"")+'">';
-    funnelHtml+='<div style="width:90px;text-align:right;font-size:11px;color:var(--gray);'+(s.bold?"font-weight:700;":"")+(s.indent?"padding-left:8px;":"")+'">'+s.label+'</div>';
-    funnelHtml+='<div style="flex:1;height:24px;background:var(--gray-light);border-radius:5px;overflow:hidden">';
-    funnelHtml+='<div style="height:100%;width:'+pct+'%;background:'+s.color+';border-radius:5px;display:flex;align-items:center;padding-left:8px;min-width:'+(s.n>0?"28px":"0")+'">';
-    if(s.n>0) funnelHtml+='<span style="font-size:11px;font-weight:700;color:#fff">'+s.n+'</span>';
-    funnelHtml+='</div></div>';
-    funnelHtml+='<div style="width:28px;text-align:right;font-size:11px;font-weight:600;color:var(--gray)">'+s.n+'</div>';
-    funnelHtml+='</div>';
-  });
-  funnelHtml+='</div>';
-  if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)</div>';
-
-  // Build manager table HTML — includes clos traités
-  const mgrData={};
-  // Use all AOs with current cross-filters (not just open)
-  const mgrSource = allAOs.filter(a=>{
-    if(dashF.dept && a.dept!==dashF.dept) return false;
-    if(dashF.domain && domainGroup(a.org)!==dashF.domain) return false;
-    if(dashF.cat && categorize(a.profil)!==dashF.cat) return false;
-    return true;
-  });
-  mgrSource.forEach(a=>{
-    const bm=a.bm;
-    if(!bm) return;
-    if(!mgrData[bm]) mgrData[bm]={total:0,aTraiter:0,repondu:0,qualif:0,demarrage:0,closTraite:0,delais:[]};
-    mgrData[bm].total++;
-    if(a.statut==="clos" && hasTraitement(a)) { mgrData[bm].closTraite++; }
-    else if(a.statut!=="clos") {
-      if(!a.dateReponse) mgrData[bm].aTraiter++;
-      if(a.dateReponse) mgrData[bm].repondu++;
-      if(a.dateQualif) mgrData[bm].qualif++;
-      if(a.dateDemarrage) mgrData[bm].demarrage++;
-    }
-    if(a.datePrise&&a.dateReponse){
-      const d1=new Date(a.datePrise),d2=new Date(a.dateReponse);
-      if(!isNaN(d1)&&!isNaN(d2)) mgrData[bm].delais.push(Math.round((d2-d1)/86400000));
-    }
-  });
-  const mgrEntries=Object.entries(mgrData).sort((a,b)=>b[1].aTraiter-a[1].aTraiter||b[1].total-a[1].total);
-  let mgrHtml='';
-  if(!mgrEntries.length){ mgrHtml='<div style="color:var(--gray);font-size:13px">Aucun BM assigné</div>'; }
-  else {
-    mgrHtml='<table style="width:100%;font-size:11.5px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
-    mgrHtml+='<th style="text-align:left;padding:4px 6px;font-weight:600;color:var(--gray)">BM</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Attribués non répondus">⚪ À traiter</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Répondus">📨 Rép.</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Qualifiés">🟣 Qual.</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Démarrés">🟢 Dém.</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Clos traités">🔵 Clos</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Délai moyen réponse">⏱️ moy.</th>';
-    mgrHtml+='<th style="text-align:center;padding:4px 4px" title="Total AO">Total</th>';
-    mgrHtml+='</tr></thead><tbody>';
-    mgrEntries.forEach(([bm,s])=>{
-      const avg=s.delais.length?Math.round(s.delais.reduce((a,b)=>a+b,0)/s.delais.length):null;
-      const sel=dashF.bm===bm;
-      mgrHtml+='<tr class="dash-click" data-key="bm" data-val="'+bm+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;'+(sel?"background:#e0f2fe;":"")+'">';
-      mgrHtml+='<td style="padding:5px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
-      mgrHtml+='<td style="text-align:center;font-weight:700;font-size:14px;color:'+(s.aTraiter>3?"var(--red)":s.aTraiter>0?"var(--amber)":"var(--green)")+'">'+s.aTraiter+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.repondu+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.qualif+'</td>';
-      mgrHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
-      mgrHtml+='<td style="text-align:center;color:#1e40af">'+s.closTraite+'</td>';
-      mgrHtml+='<td style="text-align:center;font-size:11px;color:'+(avg&&avg>5?"var(--amber)":"var(--green)")+'">'+(avg!==null?avg+"j":"—")+'</td>';
-      mgrHtml+='<td style="text-align:center;color:var(--gray)">'+s.total+'</td>';
-      mgrHtml+='</tr>';
-    });
-    mgrHtml+='</tbody></table>';
-  }
-
-  // Build dept/domain chart HTML
-  let deptChartHtml='';
-  if(dashF.dept){
-    domainEntries.forEach(([d,n])=>{
-      const sel=dashF.domain===d;
-      deptChartHtml+='<div class="bar-row dash-click" data-key="domain" data-val="'+d+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--purple);border-radius:6px;":"")+'">';
-      deptChartHtml+='<div class="bar-label" title="'+d+'">'+d+'</div>';
-      deptChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxDomain*100)+'%;background:'+(sel?"var(--green)":"var(--purple)")+'">'+n+'</div></div></div>';
-    });
-    deptChartHtml+='<div style="margin-top:8px"><button class="btn dash-tag" data-key="dept" style="font-size:11px;padding:3px 10px">← Tous les départements</button></div>';
-  } else {
-    deptEntries.forEach(([d,n])=>{
-      const sel=dashF.dept===d;
-      deptChartHtml+='<div class="bar-row dash-click" data-key="dept" data-val="'+d+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--green);border-radius:6px;":"")+'">';
-      deptChartHtml+='<div class="bar-label" title="'+d+'">'+d+'</div>';
-      deptChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxDept*100)+'%;background:var(--green)">'+n+'</div></div></div>';
-    });
-  }
-
-  // Build BM chart HTML
-  let bmChartHtml='';
-  bmEntries.forEach(([bm,n])=>{
-    const sel=dashF.bm===bm;
-    bmChartHtml+='<div class="bar-row dash-click" data-key="bm" data-val="'+bm+'" style="cursor:pointer;'+(sel?"outline:2px solid var(--blue);border-radius:6px;":"")+'">';
-    bmChartHtml+='<div class="bar-label">'+bm+'</div>';
-    bmChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxBM*100)+'%;background:'+(sel?"var(--green)":"var(--blue)")+'">'+n+'</div></div></div>';
-  });
-
-  // Build cat badges HTML
-  let catHtml='';
-  Object.entries(byCat).forEach(([c,n])=>{
-    const sel=dashF.cat===c;
-    catHtml+='<span class="badge dash-click" data-key="cat" data-val="'+c+'" style="background:'+CAT_COLORS[c]+';font-size:12px;padding:6px 14px;cursor:pointer;'+(sel?"outline:2px solid #333;outline-offset:2px;":"")+'">'+c+': '+n+'</span> ';
-  });
-
-  // Tags HTML
-  // Active filter tags
-  const tags=[];
-  if(dashF.dept) tags.push({k:"dept",v:dashF.dept});
-  if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
-  if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
-  if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
-  if(dashF.suivi) tags.push({k:"suivi",v:{tous_clos:"Total reçu",clos_nt:"Clos sans trait.",clos_t:"Clos traités",ouvert:"Non attribués",encours:"En attente rép.",repondu:"Répondus",qualif:"Qualifiés",demarrage:"Démarrés"}[dashF.suivi]||dashF.suivi});
-
-  let tagsHtml='';
-  if(tags.length){
-    tagsHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
-    tags.forEach(t=>{
-      tagsHtml+='<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="dash-tag" data-key="'+t.k+'">'+t.v+' ✕</span>';
-    });
-    tagsHtml+='</div>';
-  }
-
-  // Build period activity table with per-period per-manager data
-  const pMode=dashF.periodView||"month";
-  const periodBuckets={};
-  const periodByBM={}; // periodKey → { bmName → {recu,repondu,qualif,demarrage,clos} }
-  allAOs.forEach(a=>{
-    if(dashF.dept && a.dept!==dashF.dept) return;
-    if(dashF.domain && domainGroup(a.org)!==dashF.domain) return;
-    if(dashF.bm && (a.bm||"Non assigné")!==dashF.bm) return;
-    if(dashF.cat && categorize(a.profil)!==dashF.cat) return;
-    const pk=periodKey(a.dateOuverture||a.dateCreation, pMode);
-    if(!pk) return;
-    if(!periodBuckets[pk]) periodBuckets[pk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0};
-    if(!periodByBM[pk]) periodByBM[pk]={};
-    periodBuckets[pk].recu++;
-    const bm=a.bm||"Non assigné";
-    if(!periodByBM[pk][bm]) periodByBM[pk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0};
-    periodByBM[pk][bm].recu++;
-    if(a.dateReponse) { const rk=periodKey(a.dateReponse,pMode); if(!periodBuckets[rk]) periodBuckets[rk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[rk].repondu++; if(!periodByBM[rk]) periodByBM[rk]={}; if(!periodByBM[rk][bm]) periodByBM[rk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[rk][bm].repondu++; }
-    if(a.dateQualif) { const qk=periodKey(a.dateQualif,pMode); if(!periodBuckets[qk]) periodBuckets[qk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[qk].qualif++; if(!periodByBM[qk]) periodByBM[qk]={}; if(!periodByBM[qk][bm]) periodByBM[qk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[qk][bm].qualif++; }
-    if(a.dateDemarrage) { const dk=periodKey(a.dateDemarrage,pMode); if(!periodBuckets[dk]) periodBuckets[dk]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[dk].demarrage++; if(!periodByBM[dk]) periodByBM[dk]={}; if(!periodByBM[dk][bm]) periodByBM[dk][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[dk][bm].demarrage++; }
-    if(a.statut==="clos"&&a.dateCloture) { const ck=periodKey(a.dateCloture,pMode); if(!periodBuckets[ck]) periodBuckets[ck]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodBuckets[ck].clos++; if(!periodByBM[ck]) periodByBM[ck]={}; if(!periodByBM[ck][bm]) periodByBM[ck][bm]={recu:0,repondu:0,qualif:0,demarrage:0,clos:0}; periodByBM[ck][bm].clos++; }
-  });
-  window._periodByBM=periodByBM;
-  window._periodMode=pMode;
-  const periodEntries=Object.entries(periodBuckets).sort((a,b)=>b[0].localeCompare(a[0]));
-  const periodModes=[{k:"week",l:"Semaine"},{k:"month",l:"Mois"},{k:"quarter",l:"Trimestre"},{k:"semester",l:"Semestre"},{k:"year",l:"Année"}];
-  let periodHtml='<div style="display:flex;gap:6px;margin-bottom:12px">';
-  periodModes.forEach(pm=>{
-    const sel=pMode===pm.k;
-    periodHtml+='<button class="btn period-btn" data-period="'+pm.k+'" style="font-size:11px;padding:4px 12px;'+(sel?"background:var(--green);color:#fff;border-color:var(--green);":"")+'">'+pm.l+'</button>';
-  });
-  periodHtml+='</div>';
-  if(periodEntries.length){
-    periodHtml+='<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">';
-    periodHtml+='<thead><tr style="border-bottom:1px solid var(--border)">';
-    periodHtml+='<th style="text-align:left;padding:6px 8px;font-weight:600;color:var(--gray)">Période</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">📥 Reçus</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">📨 Rép.</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">🟣 Qual.</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">🟢 Dém.</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">⚫ Clos</th>';
-    periodHtml+='<th style="text-align:center;padding:6px 4px">📊 Taux</th>';
-    periodHtml+='</tr></thead><tbody>';
-    periodEntries.forEach(([pk,b])=>{
-      const taux=b.recu?Math.round(b.demarrage/b.recu*100):0;
-      periodHtml+='<tr class="period-row" data-pk="'+pk+'" style="border-bottom:1px solid #f8fafc;cursor:pointer;transition:background 0.1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
-      periodHtml+='<td style="padding:5px 8px;font-weight:600;white-space:nowrap">▸ '+periodLabel(pk,pMode)+'</td>';
-      periodHtml+='<td style="text-align:center;font-weight:700;color:var(--blue)">'+b.recu+'</td>';
-      periodHtml+='<td style="text-align:center">'+b.repondu+'</td>';
-      periodHtml+='<td style="text-align:center">'+b.qualif+'</td>';
-      periodHtml+='<td style="text-align:center">'+b.demarrage+'</td>';
-      periodHtml+='<td style="text-align:center;color:var(--gray)">'+b.clos+'</td>';
-      periodHtml+='<td style="text-align:center;font-weight:600;color:'+(taux>=15?"var(--green)":"var(--amber)")+'">'+taux+'%</td>';
-      periodHtml+='</tr>';
-      // Hidden sub-table placeholder
-      periodHtml+='<tr class="period-detail" data-pk="'+pk+'" style="display:none"><td colspan="7" style="padding:0"></td></tr>';
-    });
-    // Totaux
-    const totals=periodEntries.reduce((t,[,b])=>({recu:t.recu+b.recu,repondu:t.repondu+b.repondu,qualif:t.qualif+b.qualif,demarrage:t.demarrage+b.demarrage,clos:t.clos+b.clos}),{recu:0,repondu:0,qualif:0,demarrage:0,clos:0});
-    const tauxTotal=totals.recu?Math.round(totals.demarrage/totals.recu*100):0;
-    periodHtml+='<tr style="border-top:2px solid var(--border);font-weight:700">';
-    periodHtml+='<td style="padding:6px 8px">TOTAL</td>';
-    periodHtml+='<td style="text-align:center;color:var(--blue)">'+totals.recu+'</td>';
-    periodHtml+='<td style="text-align:center">'+totals.repondu+'</td>';
-    periodHtml+='<td style="text-align:center">'+totals.qualif+'</td>';
-    periodHtml+='<td style="text-align:center">'+totals.demarrage+'</td>';
-    periodHtml+='<td style="text-align:center;color:var(--gray)">'+totals.clos+'</td>';
-    periodHtml+='<td style="text-align:center;color:'+(tauxTotal>=15?"var(--green)":"var(--amber)")+'">'+tauxTotal+'%</td>';
-    periodHtml+='</tr></tbody></table></div>';
-  } else {
-    periodHtml+='<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px">Aucune donnée pour cette période</div>';
-  }
-
-  el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
-    +'<h1 style="font-size:24px;font-weight:800">Dashboard</h1>'
-    +(dashHasFilters()?'<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>':"")
-    +'</div>'
-    +tagsHtml
-    +'<div class="kpi-grid">'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+total+'</div><div class="kpi-label">AO filtrés</div>'+(dashHasFilters()?'<div class="kpi-sub">sur '+all.length+' total</div>':"")+'</div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--red)">'+nonTraite+'</div><div class="kpi-label">Non traités</div><div class="kpi-sub">'+urgent+' urgent'+(urgent>1?"s":"")+'</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--amber)">'+encours+'</div><div class="kpi-label">En cours</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--purple)">'+qualif+'</div><div class="kpi-label">Qualifiés</div></div>'
-    +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
-    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos"&&!hasTraitement(a)).length+'</div><div class="kpi-label">Clos sans trait.</div></div>'
-    +'<div class="kpi" id="kpi-clos-traite" style="cursor:pointer"><div class="kpi-value" style="color:#1e40af">'+allAOs.filter(a=>a.statut==="clos"&&hasTraitement(a)).length+'</div><div class="kpi-label">Clos traités</div></div>'
-    +'</div>'
-    +'<div class="dash-grid">'
-    +'<div class="card"><div class="card-title">🔄 Répartition des AO <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>'+funnelHtml+'</div>'
-    +'<div class="card"><div class="card-title">👥 Charge par manager</div>'+mgrHtml+'</div>'
-    +'</div>'
-    +'<div class="dash-grid">'
-    +'<div class="card"><div class="card-title">📂 '+(dashF.dept?dashF.dept+' — Domaines':'Par département')+' <span style="font-size:11px;color:var(--text-light);font-weight:400">'+(dashF.dept?"cliquez un domaine ou ← retour":"cliquez pour filtrer")+'</span></div><div class="bar-chart" id="dept-chart">'+deptChartHtml+'</div></div>'
-    +'<div class="card"><div class="card-title">👤 Par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div class="bar-chart">'+bmChartHtml+'</div></div>'
-    +'</div>'
-    +'<div class="card" style="margin-top:0"><div class="card-title">🎯 Par type de profil <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div><div style="display:flex;gap:10px;flex-wrap:wrap">'+catHtml+'</div></div>'
-    +'<div class="card"><div class="card-title">📅 Activité par période</div>'+periodHtml+'</div>'
-    +(dashHasFilters()?'<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des '+total+' AO filtrés</button></div>':"");
-
-  // Bind events
-  document.querySelectorAll(".dash-click").forEach(el=>{
-    el.addEventListener("click",()=>{
-      const k=el.dataset.key, v=el.dataset.val;
-      if(dashF[k]===v) dashF[k]=null; // toggle off
-      else dashF[k]=v;
-      // If changing dept, reset domain
-      if(k==="dept") dashF.domain=null;
-      renderDashboard(document.getElementById("main-content"));
-    });
-  });
-
-  document.querySelectorAll(".dash-tag").forEach(el=>{
-    el.addEventListener("click",()=>{
-      const k=el.dataset.key;
-      dashF[k]=null;
-      if(k==="dept") dashF.domain=null;
-      renderDashboard(document.getElementById("main-content"));
-    });
-  });
-
-  const clearBtn=document.getElementById("dash-clear");
-  if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"}; renderDashboard(document.getElementById("main-content")); });
-
-  const listBtn=document.getElementById("dash-to-list");
-  if(listBtn) listBtn.addEventListener("click",()=>{
-    filters.dept=dashF.dept||"Tous";
-    filters.cat=dashF.cat||"Tous";
-    filters.bm=dashF.bm||"Tous";
-    const suiviMap={clos_nt:"clos_nontraite",clos_t:"clos_traite",tous_clos:"Tous"};
-    filters.statut=suiviMap[dashF.suivi]||dashF.suivi||"Tous";
-    if(dashF.domain) filters.search=dashF.domain;
-    navigate("liste");
-  });
-
-  // Clos KPI → ouvre la liste filtrée sur les clos
-  const closKpi=document.getElementById("kpi-clos");
-  if(closKpi) closKpi.addEventListener("click",()=>{
-    filters.statut="clos_nontraite";
-    filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
-    navigate("liste");
-  });
-  const closTraiteKpi=document.getElementById("kpi-clos-traite");
-  if(closTraiteKpi) closTraiteKpi.addEventListener("click",()=>{
-    filters.statut="clos_traite";
-    filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
-    navigate("liste");
-  });
-
-  // Period view selector
-  document.querySelectorAll(".period-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      dashF.periodView=btn.dataset.period;
-      renderDashboard(document.getElementById("main-content"));
-    });
-  });
-
-  // Period row click → expand manager detail
-  document.querySelectorAll(".period-row").forEach(row=>{
-    row.addEventListener("click",()=>{
-      const pk=row.dataset.pk;
-      const detailRow=document.querySelector('.period-detail[data-pk="'+pk+'"]');
-      if(!detailRow) return;
-      // Toggle
-      if(detailRow.style.display!=="none"){
-        detailRow.style.display="none";
-        row.querySelector("td").textContent="▸ "+periodLabel(pk,window._periodMode);
-        return;
-      }
-      // Collapse others
-      document.querySelectorAll(".period-detail").forEach(d=>d.style.display="none");
-      document.querySelectorAll(".period-row td:first-child").forEach(td=>{
-        if(td.textContent.startsWith("▾")) td.textContent="▸"+td.textContent.slice(1);
-      });
-      // Expand this one
-      row.querySelector("td").textContent="▾ "+periodLabel(pk,window._periodMode);
-      const bmData=window._periodByBM[pk]||{};
-      const bmEntries=Object.entries(bmData).sort((a,b)=>b[1].recu-a[1].recu);
-      let subHtml='<div style="padding:8px 16px 12px;background:#f8fafc;border-radius:0 0 8px 8px">';
-      subHtml+='<div style="font-size:11px;font-weight:600;color:var(--gray);margin-bottom:6px">👤 Détail par manager — '+periodLabel(pk,window._periodMode)+'</div>';
-      subHtml+='<table style="width:100%;font-size:11.5px;border-collapse:collapse">';
-      subHtml+='<thead><tr style="border-bottom:1px solid var(--border)">';
-      subHtml+='<th style="text-align:left;padding:3px 6px;color:var(--gray)">BM</th>';
-      subHtml+='<th style="text-align:center;padding:3px 4px">📥 Reçus</th>';
-      subHtml+='<th style="text-align:center;padding:3px 4px">📨 Rép.</th>';
-      subHtml+='<th style="text-align:center;padding:3px 4px">🟣 Qual.</th>';
-      subHtml+='<th style="text-align:center;padding:3px 4px">🟢 Dém.</th>';
-      subHtml+='<th style="text-align:center;padding:3px 4px">⚫ Clos</th>';
-      subHtml+='</tr></thead><tbody>';
-      bmEntries.forEach(([bm,s])=>{
-        subHtml+='<tr style="border-bottom:1px solid #eee">';
-        subHtml+='<td style="padding:3px 6px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">'+bm+'</td>';
-        subHtml+='<td style="text-align:center;font-weight:600">'+s.recu+'</td>';
-        subHtml+='<td style="text-align:center">'+s.repondu+'</td>';
-        subHtml+='<td style="text-align:center">'+s.qualif+'</td>';
-        subHtml+='<td style="text-align:center">'+s.demarrage+'</td>';
-        subHtml+='<td style="text-align:center;color:var(--gray)">'+s.clos+'</td>';
-        subHtml+='</tr>';
-      });
-      subHtml+='</tbody></table></div>';
-      detailRow.querySelector("td").innerHTML=subHtml;
-      detailRow.style.display="table-row";
-    });
-  });
-}
-
-// ===================== LISTE AO =====================
-function renderListe(el) {
-  const open = getOpenAOs();
-  const depts = ["Tous",...new Set(allAOs.map(a=>a.dept))];
-  const cats = ["Tous",...new Set(allAOs.map(a=>categorize(a.profil)))];
-  const bms = ["Tous",...new Set(allAOs.map(a=>a.bm||"—").filter(Boolean))];
-
-  const filtered = getFilteredAOs();
-
-  let tableRows = filtered.map(a=>{
-    const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
-    const isClos=a.statut==="clos";
-    const sel=selectedRFC===a.rfc;
-    return `<tr class="row${u&&!isClos?" urg"+u:""}${isClos?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}">
-      <td class="rfc-code">${a.rfc.replace("RFC0000","").replace("RFC000","")}</td>
-      <td><span class="badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
-      <td class="profil-cell" title="${a.profil}">${a.profil}</td>
-      <td class="org-cell" title="${a.org}">${shortOrg(a.org)}</td>
-      <td>${a.dateDebut}</td>
-      <td class="r">${a.nbJours}</td>
-      <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
-      <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
-      <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
-      <td>${statutPill(sc,a)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
-    </tr>`;
-  }).join("");
-
-  el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
-    <div class="filter-bar">
-      <input type="text" id="f_search" placeholder="🔍 Rechercher..." value="${filters.search}">
-      <select id="f_dept">${depts.map(d=>`<option value="${d}"${filters.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
-      <select id="f_cat">${cats.map(c=>`<option value="${c}"${filters.cat===c?" selected":""}>${c==="Tous"?"Catégorie":c}</option>`).join("")}</select>
-      <select id="f_statut">
-        <option value="Tous"${filters.statut==="Tous"?" selected":""}>Tous les AO</option>
-        <option value="ouvert"${filters.statut==="ouvert"?" selected":""}>⚪ Non traité</option>
-        <option value="encours"${filters.statut==="encours"?" selected":""}>🟡 En cours</option>
-        <option value="qualif"${filters.statut==="qualif"?" selected":""}>🟣 Qualifié</option>
-        <option value="demarrage"${filters.statut==="demarrage"?" selected":""}>🟢 Démarré</option>
-        <option value="clos"${filters.statut==="clos"?" selected":""}>⚫ Tous clos</option>
-        <option value="clos_nontraite"${filters.statut==="clos_nontraite"?" selected":""}>⚫ Clos sans traitement</option>
-        <option value="clos_traite"${filters.statut==="clos_traite"?" selected":""}>🔵 Clos traités</option>
-      </select>
-      <select id="f_bm">${bms.map(b=>`<option value="${b}"${filters.bm===b?" selected":""}>${b==="Tous"?"Manager":b}</option>`).join("")}</select>
-      <select id="f_period">
-        <option value="all"${filters.period==="all"?" selected":""}>Toute période</option>
-        <option value="week"${filters.period==="week"?" selected":""}>7 derniers jours</option>
-        <option value="month"${filters.period==="month"?" selected":""}>30 derniers jours</option>
-        <option value="quarter"${filters.period==="quarter"?" selected":""}>Trimestre</option>
-        <option value="year"${filters.period==="year"?" selected":""}>Année</option>
-      </select>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead><tr>
-          <th class="sortable" data-col="rfc">RFC</th>
-          <th>Cat.</th><th>Profil</th><th>Domaine</th>
-          <th class="sortable" data-col="dateDebut">Début</th>
-          <th class="sortable r" data-col="nbJours">Jours</th>
-          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th>
-        </tr></thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    </div>
-    <div id="detail-area"></div>
-  `;
-
-  // Bind filters
-  document.getElementById("f_search").addEventListener("input",e=>{filters.search=e.target.value;renderListe(el);});
-  document.getElementById("f_dept").addEventListener("change",e=>{filters.dept=e.target.value;renderListe(el);});
-  document.getElementById("f_cat").addEventListener("change",e=>{filters.cat=e.target.value;renderListe(el);});
-  document.getElementById("f_statut").addEventListener("change",e=>{filters.statut=e.target.value;renderListe(el);});
-  document.getElementById("f_bm").addEventListener("change",e=>{filters.bm=e.target.value;renderListe(el);});
-  document.getElementById("f_period").addEventListener("change",e=>{filters.period=e.target.value;renderListe(el);});
-  document.querySelectorAll("th.sortable").forEach(th=>{
-    th.addEventListener("click",()=>{const c=th.dataset.col;if(sort.col===c)sort.dir=-sort.dir;else{sort.col=c;sort.dir=1;}renderListe(el);});
-  });
-  document.querySelectorAll("tr.row").forEach(tr=>{
-    tr.addEventListener("click",()=>{
-      const rfc=tr.dataset.rfc;
-      selectedRFC=selectedRFC===rfc?null:rfc;
-      renderListe(el);
-      if(selectedRFC) document.getElementById("detail-area").scrollIntoView({behavior:"smooth",block:"nearest"});
-    });
-  });
-
-  if(selectedRFC) renderDetail(document.getElementById("detail-area"), selectedRFC);
-}
-
-function renderDetail(el, rfc) {
-  const ao = allAOs.find(a=>a.rfc===rfc);
-  if(!ao) return;
-  el.innerHTML = `
-    <div class="card detail-panel">
-      <div class="detail-header">
-        <div><div class="detail-codes">${ao.rfc} · ${ao.tm}</div><h3>${ao.profil}</h3></div>
-        <button class="close-btn" id="close-detail">✕</button>
-      </div>
-      <div class="info-grid">
-        <div><div class="lbl">Intitulé</div>${ao.intitule}</div>
-        <div><div class="lbl">Organisation</div>${ao.org}</div>
-        <div><div class="lbl">Département</div>${ao.dept}</div>
-        <div><div class="lbl">Modalité</div>${ao.modalite||"—"}</div>
-        <div><div class="lbl">Période</div>${ao.dateDebut} → ${ao.dateFin}</div>
-        <div><div class="lbl">Durée</div><strong>${ao.nbJours} jours</strong></div>
-        <div><div class="lbl">📅 Date d'ouverture</div><input type="date" id="d_dateOuverture" value="${ao.dateOuverture||ao.dateCreation||""}" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;outline:none"></div>
-        <div><div class="lbl">🔒 Date de clôture</div><input type="date" id="d_dateCloture" value="${ao.dateCloture||""}" style="padding:4px 8px;border:1px solid ${ao.dateCloture?"var(--red)":"#d1d5db"};border-radius:6px;font-size:13px;outline:none"><div style="font-size:10px;color:var(--text-light);margin-top:2px">${ao.dateCloture?"⚫ Clos — vider pour réouvrir":"Remplir pour clôturer manuellement"}</div></div>
-      </div>
-      <div class="form-section">
-        <h4>📋 Suivi INTM</h4>
-        <div class="form-grid">
-          <div class="field"><label>BM qui traite</label><input class="tri" id="d_bm" maxlength="4" placeholder="VBE" value="${ao.bm||""}"></div>
-          <div class="field"><label>Date prise en charge</label><input type="date" id="d_datePrise" value="${ao.datePrise||""}"></div>
-          <div class="field"><label>Date réponse</label><input type="date" id="d_dateReponse" value="${ao.dateReponse||""}"></div>
-          <div class="field"><label>Consultant poussé</label><input class="tri" id="d_consultant" maxlength="4" placeholder="FIB" value="${ao.consultant||""}"></div>
-          <div class="field"><label>TJM proposé (€)</label><input type="number" id="d_tjm" placeholder="450" value="${ao.tjm||""}"></div>
-          <div class="field"><label>Qualif obtenue</label>
-            <select id="d_qualif"><option value=""${!ao.dateQualif?" selected":""}>Non</option><option value="oui"${ao.dateQualif?" selected":""}>Oui</option></select>
-          </div>
-          <div class="field" id="qualif-date-field" style="${ao.dateQualif?"":"display:none"}"><label>Date qualif</label><input type="date" id="d_dateQualif" value="${ao.dateQualif||""}"></div>
-          <div class="field"><label>Démarrage</label>
-            <select id="d_demarrage"><option value=""${!ao.dateDemarrage?" selected":""}>Non</option><option value="oui"${ao.dateDemarrage?" selected":""}>Oui</option></select>
-          </div>
-          <div class="field" id="dem-date-field" style="${ao.dateDemarrage?"":"display:none"}"><label>Date démarrage</label><input type="date" id="d_dateDemarrage" value="${ao.dateDemarrage||""}"></div>
-        </div>
-        <div style="margin-top:12px">
-          <div class="field"><label>📝 Notes / Commentaires</label><textarea id="d_notes" style="width:100%;height:70px;border:1px solid #d1d5db;border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none" placeholder="Ex: en attente retour client, profil envoyé le...">${ao.notes||""}</textarea></div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-green" id="save-detail">💾 Enregistrer</button>
-          <button class="btn btn-red" id="clear-detail">🗑️ Effacer le suivi</button>
-        </div>
-      </div>
-    </div>
-  `;
-  document.getElementById("close-detail").addEventListener("click",()=>{selectedRFC=null;renderView();});
-  document.getElementById("d_qualif").addEventListener("change",e=>{
-    document.getElementById("qualif-date-field").style.display=e.target.value?"":"none";
-    if(e.target.value&&!document.getElementById("d_dateQualif").value) document.getElementById("d_dateQualif").value=today();
-  });
-  document.getElementById("d_demarrage").addEventListener("change",e=>{
-    document.getElementById("dem-date-field").style.display=e.target.value?"":"none";
-    if(e.target.value&&!document.getElementById("d_dateDemarrage").value) document.getElementById("d_dateDemarrage").value=today();
-  });
-  document.getElementById("save-detail").addEventListener("click",async()=>{
-    ao.bm = document.getElementById("d_bm").value.toUpperCase().trim();
-    ao.datePrise = document.getElementById("d_datePrise").value;
-    ao.dateReponse = document.getElementById("d_dateReponse").value;
-    ao.consultant = document.getElementById("d_consultant").value.toUpperCase().trim();
-    ao.tjm = document.getElementById("d_tjm").value;
-    ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
-    ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
-    ao.notes = document.getElementById("d_notes").value.trim();
-    ao.dateOuverture = document.getElementById("d_dateOuverture").value;
-    ao.dateCloture = document.getElementById("d_dateCloture").value;
-    ao.statut = ao.dateCloture ? "clos" : "ouvert";
-    if(ao.bm && !ao.datePrise) ao.datePrise = today();
-    await dbPut("aos", ao);
-    renderView();
-  });
-  document.getElementById("clear-detail").addEventListener("click",async()=>{
-    if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
-    ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
-    await dbPut("aos", ao);
-    renderView();
-  });
-}
-
-// ===================== IMPORT =====================
-function renderImport(el) {
-  el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import PWise</h1>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">Copiez le texte brut depuis PWise et collez-le ici. Les nouveaux AO seront ajoutés, les AO absents seront marqués comme clos.</p>
-
-    <div class="card">
-      <div class="card-title">📄 Coller le texte ou charger un fichier</div>
-      <textarea id="import-text" style="width:100%;height:200px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le contenu copié depuis PWise..."></textarea>
-      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
-        <button class="btn btn-green" id="run-import">🚀 Lancer l'import</button>
-        <span style="color:var(--gray);font-size:12px">ou</span>
-        <label class="btn" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
-          📎 Charger un fichier .txt
-          <input type="file" id="import-file" accept=".txt,.text" style="display:none">
-        </label>
-      </div>
-    </div>
-    <div id="import-result"></div>
-    <div id="import-history"></div>
-  `;
-
-  document.getElementById("import-file").addEventListener("change",e=>{
-    const file=e.target.files[0];
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{document.getElementById("import-text").value=ev.target.result;};
-    reader.readAsText(file);
-  });
-
-  document.getElementById("run-import").addEventListener("click", async()=>{
-    const raw = document.getElementById("import-text").value.trim();
-    if(!raw){alert("Collez d'abord le texte PWise.");return;}
-    const parsed = parseAOs(raw);
-    if(!parsed.length){document.getElementById("import-result").innerHTML=`<div class="import-warn" style="margin-top:16px">⚠️ Aucun AO détecté. Vérifiez le format du texte.</div>`;return;}
-
-    const existing = await dbGetAll("aos");
-    const existingMap = {};
-    existing.forEach(a=>{existingMap[a.rfc]=a;});
-    const importedRFCs = new Set(parsed.map(a=>a.rfc));
-
-    let added=0, updated=0, closed=0, unchanged=0;
-    const toSave = [];
-
-    // Add/update
-    parsed.forEach(p=>{
-      const ex = existingMap[p.rfc];
-      if(!ex){
-        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()});
-        added++;
-      } else {
-        // Update PWise fields, keep tracking
-        let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
-        const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport:today(),
-          bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
-          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateOuverture:ex.dateOuverture||ex.dateCreation||today(), dateCreation:ex.dateCreation||today()};
-        toSave.push(merged);
-        if(changed) updated++; else unchanged++;
-      }
-    });
-
-    // Close missing — with grace period for responded AOs
-    let pending=0;
-    existing.forEach(ex=>{
-      if(ex.statut==="clos"||importedRFCs.has(ex.rfc)) return;
-      // AO has been responded to → grace period of 30 days
-      if(ex.dateReponse) {
-        const dispDate = ex.dateDisparition || today();
-        const daysSinceDisp = Math.round((new Date() - new Date(dispDate)) / 86400000);
-        if(daysSinceDisp < 30) {
-          // Keep open but mark as "disappeared"
-          toSave.push({...ex, dateDisparition: ex.dateDisparition || today(), dernierImport:today()});
-          pending++;
-          return;
-        }
-        // 30+ days gone → close
-      }
-      toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
-      closed++;
-    });
-
-    // AOs that reappear → clear dateDisparition
-    parsed.forEach(p=>{
-      const saved = toSave.find(s=>s.rfc===p.rfc);
-      if(saved && saved.dateDisparition) saved.dateDisparition="";
-    });
-
-    await dbPutMany("aos", toSave);
-    await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added, updated, closed, pending, unchanged});
-
-    document.getElementById("import-result").innerHTML=`
-      <div class="import-ok" style="margin-top:16px">
-        <strong>✅ Import réussi !</strong><br>
-        📊 ${parsed.length} AO dans le fichier<br>
-        🆕 ${added} nouveau${added>1?"x":""} · ♻️ ${updated} mis à jour · 🔒 ${closed} clos · ✔️ ${unchanged} inchangé${unchanged>1?"s":""}${pending?` · ⏳ ${pending} en sursis (répondus, clos dans <30j)`:""}
-      </div>`;
-
-    loadImportHistory();
-  });
-
-  loadImportHistory();
-}
-
-async function loadImportHistory() {
-  const imports = await dbGetAll("imports");
-  const el = document.getElementById("import-history");
-  if(!el||!imports.length) return;
-  const recent = imports.sort((a,b)=>(b.id||0)-(a.id||0)).slice(0,10);
-  el.innerHTML=`<div class="card" style="margin-top:16px"><div class="card-title">📜 Historique des imports</div>
-    <table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Heure</th><th>AO parsés</th><th>Nouveaux</th><th>Mis à jour</th><th>Clos</th></tr></thead>
-    <tbody>${recent.map(i=>`<tr><td>${i.date}</td><td>${i.time}</td><td>${i.nbParsed}</td><td>${i.added}</td><td>${i.updated}</td><td>${i.closed}</td></tr>`).join("")}</tbody></table></div>`;
-}
-
-// ===================== EXPORT =====================
-function renderExport(el) {
-  el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Export</h1>
-    <div class="card">
-      <div class="card-title">📤 Exporter les données</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Exportez toutes les données AO + suivi au format CSV ou JSON.</p>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-green" onclick="doExportCSV()">📥 Export CSV</button>
-        <button class="btn" onclick="doExportJSON()">📥 Export JSON (sauvegarde)</button>
-        <label class="btn" style="cursor:pointer">📎 Restaurer JSON <input type="file" accept=".json" style="display:none" onchange="doImportJSON(event)"></label>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-title">📧 Rapport hebdomadaire</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Génère un résumé prêt à copier-coller dans un mail ou Teams pour le point d'équipe.</p>
-      <button class="btn btn-green" id="gen-report">📋 Générer le rapport</button>
-      <div id="report-area"></div>
-    </div>
-  `;
-  document.getElementById("gen-report").addEventListener("click",()=>{
-    const open=getOpenAOs();
-    const now=new Date();
-    const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
-
-    // Stats
-    const total=open.length;
-    const nonTraite=open.filter(a=>statutSuivi(a)==="ouvert").length;
-    const reponduSemaine=open.filter(a=>a.dateReponse&&new Date(a.dateReponse)>=weekAgo).length;
-    const qualifSemaine=open.filter(a=>a.dateQualif&&new Date(a.dateQualif)>=weekAgo).length;
-    const demSemaine=open.filter(a=>a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo).length;
-    const totalRepondu=open.filter(a=>a.dateReponse).length;
-    const totalQualif=open.filter(a=>a.dateQualif).length;
-    const totalDem=open.filter(a=>a.dateDemarrage).length;
-
-    // Par BM
-    const bms={};
-    open.forEach(a=>{
-      const bm=a.bm;if(!bm)return;
-      if(!bms[bm])bms[bm]={total:0,reponduSem:0,qualifSem:0,demSem:0,nonTraite:0};
-      bms[bm].total++;
-      if(statutSuivi(a)==="ouvert") bms[bm].nonTraite++;
-      if(a.dateReponse&&new Date(a.dateReponse)>=weekAgo) bms[bm].reponduSem++;
-      if(a.dateQualif&&new Date(a.dateQualif)>=weekAgo) bms[bm].qualifSem++;
-      if(a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo) bms[bm].demSem++;
-    });
-
-    // AO urgents
-    const urgents=open.filter(a=>urgency(a.dateDebut)>=2&&statutSuivi(a)==="ouvert");
-
-    // AO avec notes récentes
-    const avecNotes=open.filter(a=>a.notes).slice(0,5);
-
-    const dateStr=now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-
-    let report=`📊 RAPPORT HEBDO AO BCEF — ${dateStr}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📈 VUE D'ENSEMBLE
-• ${total} AO ouverts dont ${nonTraite} non traités
-• Funnel : ${total} ouverts → ${totalRepondu} répondus → ${totalQualif} qualifiés → ${totalDem} démarrés
-• Taux conversion global : ${total?Math.round(totalDem/total*100):0}%
-
-📅 ACTIVITÉ DE LA SEMAINE
-• ${reponduSemaine} réponse(s) envoyée(s)
-• ${qualifSemaine} qualification(s) obtenue(s)
-• ${demSemaine} démarrage(s)`;
-
-    if(Object.keys(bms).length){
-      report+=`\n\n👤 PAR MANAGER`;
-      Object.entries(bms).sort((a,b)=>b[1].total-a[1].total).forEach(([bm,s])=>{
-        report+=`\n• ${bm} : ${s.total} AO (${s.nonTraite} à traiter)`;
-        const acts=[];
-        if(s.reponduSem) acts.push(s.reponduSem+" rép.");
-        if(s.qualifSem) acts.push(s.qualifSem+" qualif");
-        if(s.demSem) acts.push(s.demSem+" dém.");
-        if(acts.length) report+=` — semaine : ${acts.join(", ")}`;
-      });
+      // ─ Dashboard
+      return React.createElement("div", { style: { minHeight:"100vh", background:P.bg, color:P.tx } },
+        // Header
+        React.createElement("div", {
+          style: {
+            background:P.card+"ee", borderBottom:`1px solid ${P.bdr}`,
+            padding:"12px 24px", display:"flex", alignItems:"center", gap:14, flexWrap:"wrap",
+            position:"sticky", top:0, zIndex:100, backdropFilter:"blur(12px)",
+          }
+        },
+          React.createElement("div", { style:{display:"flex",alignItems:"center",gap:10,marginRight:"auto"} },
+            React.createElement("span", { style:{fontSize:20} }, "📊"),
+            React.createElement("span", { style:{fontWeight:700,fontSize:16,letterSpacing:-.3} }, "INTM Finance"),
+            React.createElement("span", { style:{fontSize:10,color:P.txD,background:P.bdr,padding:"2px 8px",borderRadius:4} },
+              fname.length>35 ? fname.slice(0,35)+"…" : fname
+            ),
+          ),
+          React.createElement(BmToggle, { sel:bm, onChange:setBm }),
+          React.createElement("div", { style:{display:"flex",gap:4,background:P.bg,borderRadius:8,padding:3} },
+            [["dash","Dashboard"],["table","Consultants"]].map(([k,l]) =>
+              React.createElement("button", {
+                key:k, onClick:()=>setView(k),
+                style: {
+                  padding:"6px 14px",borderRadius:6,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,
+                  background:view===k?P.acc+"22":"transparent", color:view===k?P.acc:P.txM,
+                }
+              }, l)
+            )
+          ),
+          React.createElement("label", {
+            style: { padding:"6px 14px",borderRadius:8,cursor:"pointer",fontSize:12,fontWeight:600,border:`1px solid ${P.bdr}`,color:P.txM,transition:"all .15s" },
+            onMouseEnter: e=>{e.currentTarget.style.borderColor=P.acc;e.currentTarget.style.color=P.acc},
+            onMouseLeave: e=>{e.currentTarget.style.borderColor=P.bdr;e.currentTarget.style.color=P.txM},
+          },
+            "↻ Ré-importer",
+            React.createElement("input", { type:"file",accept:".xlsx,.xls",hidden:true, onChange:e=>{const f=e.target.files?.[0];if(f)load(f)} })
+          )
+        ),
+
+        React.createElement("div", { style:{padding:"20px 24px",maxWidth:1340,margin:"0 auto"} },
+          // Month tabs
+          React.createElement("div", { style:{marginBottom:20,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"} },
+            React.createElement(MonthTabs, { months, sel:selM, onChange:setSelM }),
+            React.createElement("div", { style:{fontSize:12,color:P.txD,marginLeft:"auto"} },
+              `${cur.jo} jrs ouvrés · ${cur.simu?"Simulation":"Réel"}`
+            ),
+          ),
+
+          // Dashboard view
+          view==="dash" && k && React.createElement(React.Fragment, null,
+            // KPI cards
+            React.createElement("div", { style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(185px,1fr))",gap:14,marginBottom:20} },
+              React.createElement(KCard, { label:"Production", value:fK(k.totalProd)+"€", sub:`TJM moy. ${fmt(k.tjmMoy)}€`, color:P.acc, delay:"0s" }),
+              React.createElement(KCard, { label:"MC1 après RFA", value:fK(k.mc1)+"€", sub:`Taux MC1: ${fP(k.mc1R)}`, color:k.mc1>=0?P.grn:P.red, delay:".05s" }),
+              React.createElement(KCard, { label:"REX", value:fK(k.rex)+"€", sub:`REX/CA: ${fP(k.rexR)}`, color:k.rex>=0?P.grn:P.red, delay:".1s" }),
+              React.createElement(KCard, { label:"Consultants", value:k.collabs, sub:`${k.enMission} mission · ${k.icCount} IC`, color:P.pur, delay:".15s" }),
+              React.createElement(KCard, { label:"Taux Occupation", value:fP(k.taux), color:k.taux>=.85?P.grn:P.amb, delay:".2s" }),
+              React.createElement(KCard, { label:"Coût S/T", value:fK(k.totalST)+"€", color:P.txM, delay:".25s" }),
+            ),
+            // Charts row
+            React.createElement("div", { style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20} },
+              React.createElement(Trend, { months, bm }),
+              React.createElement(TopClients, { data:k.data }),
+            ),
+            // BM + Alerts row
+            React.createElement("div", { style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:20} },
+              React.createElement(BmCompare, { rows:cur.rows, jo:cur.jo }),
+              React.createElement(Alerts, { data:k.data, jo:cur.jo }),
+            ),
+          ),
+
+          // Table view
+          view==="table" && k && React.createElement(Table, { data:k.data, jo:cur.jo }),
+        )
+      );
     }
 
-    if(urgents.length){
-      report+=`\n\n🚨 AO URGENTS (non traités, début imminent)`;
-      urgents.slice(0,8).forEach(a=>{
-        report+=`\n• ${a.rfc} — ${a.profil.substring(0,50)} — début ${a.dateDebut}`;
-      });
-    }
-
-    if(avecNotes.length){
-      report+=`\n\n📝 NOTES RÉCENTES`;
-      avecNotes.forEach(a=>{
-        report+=`\n• ${a.rfc} (${a.bm||"?"}) : ${a.notes.substring(0,80)}`;
-      });
-    }
-
-    report+=`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nGénéré depuis INTM AO Manager`;
-
-    document.getElementById("report-area").innerHTML=`
-      <div style="margin-top:14px;background:#0f172a;border-radius:10px;padding:16px;position:relative">
-        <button class="btn" style="position:absolute;top:10px;right:10px;font-size:11px;padding:4px 10px" onclick="navigator.clipboard.writeText(document.getElementById('report-text').textContent);this.textContent='✅ Copié !';setTimeout(()=>this.textContent='📋 Copier',1500)">📋 Copier</button>
-        <pre id="report-text" style="color:#e2e8f0;font-size:12.5px;font-family:'Cascadia Code','Fira Code',monospace;white-space:pre-wrap;line-height:1.6;margin:0">${report}</pre>
-      </div>`;
-  });
-}
-
-function doExportCSV(){
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
-  allAOs.forEach(a=>{
-    const ss=statutComplet(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
-  });
-  download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
-}
-
-function doExportJSON(){
-  const data = {version:1, exportDate:new Date().toISOString(), aos:allAOs};
-  download("ao_bcef_backup.json", JSON.stringify(data,null,2), "application/json");
-}
-
-async function doImportJSON(e){
-  const file=e.target.files[0]; if(!file)return;
-  const text=await file.text();
-  try{
-    const data=JSON.parse(text);
-    if(!data.aos||!data.aos.length){alert("Fichier invalide.");return;}
-    if(!confirm(`Restaurer ${data.aos.length} AO depuis la sauvegarde du ${data.exportDate||"?"} ?\nCela écrasera les données existantes.`))return;
-    await dbPutMany("aos",data.aos);
-    alert("✅ Restauration terminée !");
-    renderView();
-  }catch(err){alert("Erreur de lecture: "+err.message);}
-}
-
-function download(filename, content, type){
-  const blob=new Blob([content],{type});
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();
-}
-
-// ===================== SEED — Import initial automatique =====================
-const SEED=`btnMasterDetail\nRFC00004114\nBCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))\nTM00004671\nL6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nProject Manager Risques IT & Cyber Sécurité Niveau 2\nSur Site\n13/04/2026 - 31/12/2026\n151,00\nbtnMasterDetail\nRFC00004045\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004676\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00004038\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004675\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003897\nBCEF IT MDEP Nantes Intégrateur squad Xpay Estreem\nTM00004484\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003890\nBCEF IT - Business Analyst Socle Data DHV2 (CS)\nTM00004420\nL6_BCEF IT - 2DAI 2 DATA IA\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003863\nBCEF IT - BA - Crédits Pro ER (MCS)\nTM00004311\nL6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003855\nBCEF IT-DIFA 2-MBE Tech Lead Socle MBE (CS)\nTM00004407\nL6_BCEF IT - DIFA 2 ASSETS DIGITAUX CORPORATE ET TRANSVERSAUX\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nExpert Technique Niveau 1\nSur Site\n15/04/2026 - 31/12/2026\n150,00\nbtnMasterDetail\nRFC00003835\nBCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2\nTM00004167\nL6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003827\nBCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2\nTM00004150\nL6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 3\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003797\nBCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)\nTM00004273\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003728\n[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO\nTM00004424\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/10/2026\n130,00\nbtnMasterDetail\nRFC00003679\nBCEF IT - Assurance vie - Gestion de projet (MCS)\nTM00004330\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003672\nBCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte\nTM00004274\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n03/06/2026 - 31/12/2026\n124,00\nbtnMasterDetail\nRFC00003642\nBCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK\nTM00003799\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nBCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA\nSur Site\n13/04/2026 - 30/09/2026\n118,00\nbtnMasterDetail\nRFC00003372\nBCEF IT - CBO - Analyse de Test - Contrat d Offres (CLA)\nTM00003975\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n30/03/2026 - 31/12/2026\n159,00\nbtnMasterDetail\nRFC00003355\nChargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)\nTM00003847\nL6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n06/04/2026 - 30/09/2026\n122,00\nbtnMasterDetail\nRFC00003294\nBCEF IT - CP Senior Mise en oeuvre exigences DCC2 - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)\nTM00004067\nL6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n01/04/2026 - 30/06/2026\n50,00\nbtnMasterDetail\nRFC00003018\nBCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java\nTM00003880\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n06/04/2026 - 31/12/2026\n155,00\nbtnMasterDetail\nRFC00002985\nBCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)\nTM00001894\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n02/03/2026 - 31/12/2026\n175,00\nbtnMasterDetail\nRFC00001175\nBCEF IT - OSBA4 - Epargne - BA - Reporting Transverses\nTM00001974\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00000929\nBCEF IT Projet Gestion Sous Mandat (CLA)\nTM00001888\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n16/03/2026 - 31/12/2026\n167,00`;
-
-async function seedIfEmpty(){
-  const existing = await dbGetAll("aos");
-  if(existing.length > 0) return;
-  const parsed = parseAOs(SEED);
-  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()}));
-  await dbPutMany("aos", toSave);
-  await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
-  console.log("Seed: "+parsed.length+" AO importés");
-}
-
-async function init(){
-  try {
-    await openDB();
-    const statusEl=document.getElementById("db-status");
-    if(useSupabase) statusEl.innerHTML='🟢 En ligne';
-    else statusEl.innerHTML='🟡 Mode local';
-    statusEl.style.background=useSupabase?"rgba(0,145,90,0.15)":"rgba(245,158,11,0.15)";
-    statusEl.style.color=useSupabase?"#4ade80":"#fbbf24";
-    await seedIfEmpty();
-
-    // Mobile menu
-    const menuBtn=document.getElementById("menu-toggle");
-    const sidebar=document.getElementById("sidebar");
-    const overlay=document.getElementById("sidebar-overlay");
-    function toggleMenu(){ sidebar.classList.toggle("open"); overlay.classList.toggle("open"); }
-    function closeMenu(){ sidebar.classList.remove("open"); overlay.classList.remove("open"); }
-    menuBtn.addEventListener("click", toggleMenu);
-    overlay.addEventListener("click", closeMenu);
-
-    document.querySelectorAll(".nav-item").forEach(n=>{
-      n.addEventListener("click",()=>{ closeMenu(); navigate(n.dataset.view); });
-    });
-    await renderView();
-  } catch(e) {
-    document.getElementById("main-content").innerHTML='<div style="padding:40px;color:red;font-size:14px"><h2>Erreur au chargement</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
-  }
-}
-
-init();
-</script>
+    ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  </script>
 </body>
 </html>
