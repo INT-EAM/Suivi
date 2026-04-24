@@ -402,6 +402,18 @@ async function loadHistoricalAOs() {
 }
 
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
+
+// Date de début du dashboard (encours actif depuis début avril)
+let dashDateFrom = "2026-04-01";
+
+function getDashAOs() {
+  return allAOs.filter(a => {
+    const d = a.dateOuverture || a.dateCreation || "";
+    if(!d) return true; // pas de date = inclus
+    return d >= dashDateFrom;
+  });
+}
+function getDashOpenAOs() { return getDashAOs().filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
   let f = allAOs;
   if(filters.statut==="clos_nontraite") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
@@ -452,7 +464,7 @@ async function renderView() {
 let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null, periodView:"month" };
 
 function dashFilteredAOs() {
-  let f = (dashF.suivi==="tous_clos"||dashF.suivi==="clos_nt"||dashF.suivi==="clos_t") ? [...allAOs] : getOpenAOs();
+  let f = (dashF.suivi==="tous_clos"||dashF.suivi==="clos_nt"||dashF.suivi==="clos_t") ? [...getDashAOs()] : getDashOpenAOs();
   if(dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
   if(dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
   if(dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
@@ -473,7 +485,7 @@ function dashFilteredAOs() {
 function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat||dashF.suivi; }
 
 function renderDashboard(el) {
-  const all = getOpenAOs();
+  const all = getDashOpenAOs();
   const filtered = dashFilteredAOs();
   const total=filtered.length;
   const encours=filtered.filter(a=>["encours","repondu"].includes(statutSuivi(a))).length;
@@ -483,7 +495,7 @@ function renderDashboard(el) {
   const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
 
   function subFilter(exclude) {
-    let f=all;
+    let f=getDashOpenAOs();
     if(exclude!=="dept" && dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
     if(exclude!=="domain" && dashF.domain) f=f.filter(a=>domainGroup(a.org)===dashF.domain);
     if(exclude!=="bm" && dashF.bm) f=f.filter(a=>(a.bm||"Non assigné")===dashF.bm);
@@ -520,7 +532,7 @@ function renderDashboard(el) {
   const catData=subFilter("cat");
   const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
 
-  const fClosNT=allAOs.filter(a=>{
+  const fClosNT=getDashAOs().filter(a=>{
     if(a.statut!=="clos"||hasTraitement(a)) return false;
     if(dashF.dept&&a.dept!==dashF.dept) return false;
     if(dashF.domain&&domainGroup(a.org)!==dashF.domain) return false;
@@ -528,7 +540,7 @@ function renderDashboard(el) {
     if(dashF.cat&&categorize(a.profil)!==dashF.cat) return false;
     return true;
   }).length;
-  const fClosT=allAOs.filter(a=>{
+  const fClosT=getDashAOs().filter(a=>{
     if(a.statut!=="clos"||!hasTraitement(a)) return false;
     if(dashF.dept&&a.dept!==dashF.dept) return false;
     if(dashF.domain&&domainGroup(a.org)!==dashF.domain) return false;
@@ -572,7 +584,7 @@ function renderDashboard(el) {
   if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)</div>';
 
   const mgrData={};
-  const mgrSource = allAOs.filter(a=>{
+  const mgrSource = getDashAOs().filter(a=>{
     if(dashF.dept && a.dept!==dashF.dept) return false;
     if(dashF.domain && domainGroup(a.org)!==dashF.domain) return false;
     if(dashF.cat && categorize(a.profil)!==dashF.cat) return false;
@@ -677,7 +689,7 @@ function renderDashboard(el) {
   const pMode=dashF.periodView||"month";
   const periodBuckets={};
   const periodByBM={};
-  allAOs.forEach(a=>{
+  getDashAOs().forEach(a=>{
     if(dashF.dept && a.dept!==dashF.dept) return;
     if(dashF.domain && domainGroup(a.org)!==dashF.domain) return;
     if(dashF.bm && (a.bm||"Non assigné")!==dashF.bm) return;
@@ -744,9 +756,14 @@ function renderDashboard(el) {
     periodHtml+='<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px">Aucune donnée pour cette période</div>';
   }
 
-  el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">'
     +'<h1 style="font-size:24px;font-weight:800">Dashboard</h1>'
-    +(dashHasFilters()?'<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Réinitialiser</button>':"")
+    +'<div style="display:flex;align-items:center;gap:8px;margin-left:auto">'
+    +'<label style="font-size:12px;color:var(--gray);font-weight:500">Depuis :</label>'
+    +'<input type="date" id="dash-date-from" value="'+dashDateFrom+'" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;outline:none">'
+    +'<span style="font-size:12px;color:var(--text-light)">'+getDashAOs().length+' AO</span>'
+    +(dashHasFilters()?'<button class="btn" id="dash-clear" style="font-size:11px;padding:4px 12px">✕ Filtres</button>':"")
+    +'</div>'
     +'</div>'
     +tagsHtml
     +'<div class="kpi-grid">'
@@ -755,8 +772,8 @@ function renderDashboard(el) {
     +'<div class="kpi"><div class="kpi-value" style="color:var(--amber)">'+encours+'</div><div class="kpi-label">En cours</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--purple)">'+qualif+'</div><div class="kpi-label">Qualifiés</div></div>'
     +'<div class="kpi"><div class="kpi-value" style="color:var(--green)">'+demarrage+'</div><div class="kpi-label">Démarrés</div></div>'
-    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+allAOs.filter(a=>a.statut==="clos"&&!hasTraitement(a)).length+'</div><div class="kpi-label">Clos sans trait.</div></div>'
-    +'<div class="kpi" id="kpi-clos-traite" style="cursor:pointer"><div class="kpi-value" style="color:#1e40af">'+allAOs.filter(a=>a.statut==="clos"&&hasTraitement(a)).length+'</div><div class="kpi-label">Clos traités</div></div>'
+    +'<div class="kpi" id="kpi-clos" style="cursor:pointer"><div class="kpi-value" style="color:var(--gray)">'+getDashAOs().filter(a=>a.statut==="clos"&&!hasTraitement(a)).length+'</div><div class="kpi-label">Clos sans trait.</div></div>'
+    +'<div class="kpi" id="kpi-clos-traite" style="cursor:pointer"><div class="kpi-value" style="color:#1e40af">'+getDashAOs().filter(a=>a.statut==="clos"&&hasTraitement(a)).length+'</div><div class="kpi-label">Clos traités</div></div>'
     +'</div>'
     +'<div class="dash-grid">'
     +'<div class="card"><div class="card-title">🔄 Répartition des AO <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour filtrer</span></div>'+funnelHtml+'</div>'
@@ -791,6 +808,9 @@ function renderDashboard(el) {
 
   const clearBtn=document.getElementById("dash-clear");
   if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"}; renderDashboard(document.getElementById("main-content")); });
+
+  const dateFromInput=document.getElementById("dash-date-from");
+  if(dateFromInput) dateFromInput.addEventListener("change",e=>{ dashDateFrom=e.target.value; renderDashboard(document.getElementById("main-content")); });
 
   const listBtn=document.getElementById("dash-to-list");
   if(listBtn) listBtn.addEventListener("click",()=>{
@@ -1083,24 +1103,51 @@ async function renderHistorique(el) {
   }
 
   const total     = f.length;
-  const soumis    = f.filter(a => ["repondu","qualif","demarrage"].includes(suiviFromPwise(a.statutPwise))).length;
+  const soumis    = f.filter(a => ["repondu","demarrage"].includes(suiviFromPwise(a.statutPwise))).length;
   const retenus   = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage").length;
   const nonRetenus= f.filter(a => suiviFromPwise(a.statutPwise) === "clos").length;
+  const encours   = f.filter(a => suiviFromPwise(a.statutPwise) === "encours").length;
+  const reponduSeulement = f.filter(a => suiviFromPwise(a.statutPwise) === "repondu").length;
   const tauxGlobal= total ? Math.round(retenus / total * 100) : 0;
   const tauxSoumis= soumis ? Math.round(retenus / soumis * 100) : 0;
+
+  // TJM moyen
+  const tjms = f.filter(a => a.nbJours > 0).map(a => a.nbJours);
+  const avgJours = tjms.length ? Math.round(tjms.reduce((a,b)=>a+b,0)/tjms.length) : 0;
+
+  // Funnel global
+  const funnelSteps = [
+    {label:"Total reçus", n:total, color:"#475569"},
+    {label:"En cours", n:encours, color:"#3b82f6", indent:true},
+    {label:"Répondus", n:reponduSeulement, color:"#f59e0b", indent:true},
+    {label:"Non retenus", n:nonRetenus, color:"#94a3b8", indent:true},
+    {label:"Retenus ✓", n:retenus, color:"#00915a", indent:true},
+  ];
+  const fMax = Math.max(total,1);
+  let funnelHtml = '<div style="display:flex;flex-direction:column;gap:4px">';
+  funnelSteps.forEach(s => {
+    const pct = Math.max(Math.round(s.n/fMax*100), s.n>0?4:0);
+    funnelHtml += `<div class="bar-row"><div style="width:100px;text-align:right;font-size:11px;color:var(--gray);${s.indent?"padding-left:8px":""}">${s.label}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${s.color};min-width:${s.n>0?"28px":"0"}">${s.n>0?`<span style="font-size:11px;font-weight:700;color:#fff">${s.n}</span>`:""}</div></div>
+    <div style="width:30px;text-align:right;font-size:11px;font-weight:600;color:var(--gray)">${s.n}</div></div>`;
+  });
+  funnelHtml += `<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion global : <strong style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</strong> · Taux soumis→retenu : <strong style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</strong></div>`;
+  funnelHtml += '</div>';
 
   // Par entité
   const byDept = {};
   f.forEach(a => {
     const d = a.dept || "—";
-    if (!byDept[d]) byDept[d] = { total: 0, soumis: 0, retenu: 0, clos: 0 };
+    if (!byDept[d]) byDept[d] = { total: 0, retenu: 0, clos: 0, encours: 0, repondu: 0 };
     byDept[d].total++;
     const s = suiviFromPwise(a.statutPwise);
-    if (["repondu","demarrage"].includes(s)) byDept[d].soumis++;
     if (s === "demarrage") byDept[d].retenu++;
-    if (s === "clos") byDept[d].clos++;
+    else if (s === "clos") byDept[d].clos++;
+    else if (s === "encours") byDept[d].encours++;
+    else if (s === "repondu") byDept[d].repondu++;
   });
   const deptEntries = Object.entries(byDept).sort((a,b) => b[1].total - a[1].total);
+  const maxDept = deptEntries.length ? deptEntries[0][1].total : 1;
 
   // Par domaine (top 15)
   const byDomain = {};
@@ -1113,6 +1160,7 @@ async function renderHistorique(el) {
     if (s === "clos") byDomain[d].clos++;
   });
   const domainEntries = Object.entries(byDomain).sort((a,b) => b[1].total - a[1].total).slice(0, 15);
+  const maxDom = domainEntries.length ? domainEntries[0][1].total : 1;
 
   // Par type profil
   const byCat = {};
@@ -1129,20 +1177,20 @@ async function renderHistorique(el) {
   const byStatut = {};
   f.forEach(a => { const s = a.statutPwise||"—"; byStatut[s] = (byStatut[s]||0) + 1; });
 
-  // ── HTML ──
-  const maxDept = deptEntries.length ? deptEntries[0][1].total : 1;
-  const maxDom  = domainEntries.length ? domainEntries[0][1].total : 1;
-
   let deptHtml = '';
   deptEntries.forEach(([d, s]) => {
     const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
     const selD = histF.dept === d;
-    deptHtml += `<div class="bar-row dash-click hist-dept-click" data-dept="${d}" style="cursor:pointer;${selD?"outline:2px solid var(--green);border-radius:6px;":""}">
-      <div class="bar-label" title="${d}" style="width:160px">${d}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDept*100)}%;background:${selD?"var(--green)":"var(--blue)"}">
-        <span style="font-size:10px">${s.total}</span>
-      </div></div>
-      <div style="width:24px;text-align:right;font-size:11px;font-weight:600;color:var(--green)">${taux}%</div>
+    const barW = Math.round(s.total/maxDept*100);
+    deptHtml += `<div class="bar-row hist-dept-click" data-dept="${d}" style="cursor:pointer;${selD?"outline:2px solid var(--green);border-radius:6px;":""}">
+      <div class="bar-label" title="${d}" style="width:180px">${d}</div>
+      <div class="bar-track" style="position:relative">
+        <div class="bar-fill" style="width:${barW}%;background:${selD?"var(--green)":"var(--blue)"}">
+          <span style="font-size:10px">${s.total}</span>
+        </div>
+        ${s.retenu>0?`<div style="position:absolute;left:${barW}%;top:0;height:100%;width:${Math.round(s.retenu/maxDept*100)}%;background:rgba(0,145,90,0.3);border-radius:0 6px 6px 0"></div>`:""}
+      </div>
+      <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
     </div>`;
   });
 
@@ -1154,20 +1202,23 @@ async function renderHistorique(el) {
       <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDom*100)}%;background:var(--purple)">
         <span style="font-size:10px">${s.total}</span>
       </div></div>
-      <div style="width:24px;text-align:right;font-size:11px;font-weight:600;color:var(--purple)">${taux}%</div>
+      <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
     </div>`;
   });
 
   let catHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
-  catHtml += '<th style="text-align:left;padding:5px 8px">Type profil</th><th style="text-align:center">Reçus</th><th style="text-align:center">Retenus</th><th style="text-align:center">Non retenus</th><th style="text-align:center">Taux</th></tr></thead><tbody>';
+  catHtml += '<th style="text-align:left;padding:5px 8px">Type profil</th><th style="text-align:center">Reçus</th><th style="text-align:center">Retenus</th><th style="text-align:center">Non ret.</th><th style="text-align:center">Taux</th><th style="text-align:center">Moy. jours</th></tr></thead><tbody>';
   Object.entries(byCat).sort((a,b) => b[1].total - a[1].total).forEach(([c,s]) => {
     const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+    const joursCat = f.filter(a => categorize(a.profil)===c && a.nbJours>0).map(a=>a.nbJours);
+    const avgJ = joursCat.length ? Math.round(joursCat.reduce((a,b)=>a+b,0)/joursCat.length) : 0;
     catHtml += `<tr style="border-bottom:1px solid #f8fafc">
       <td style="padding:5px 8px"><span class="badge" style="background:${CAT_COLORS[c]}">${c}</span></td>
       <td style="text-align:center;font-weight:700">${s.total}</td>
       <td style="text-align:center;color:var(--green);font-weight:600">${s.retenu}</td>
       <td style="text-align:center;color:var(--gray)">${s.clos}</td>
       <td style="text-align:center;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</td>
+      <td style="text-align:center;color:var(--gray)">${avgJ||"—"}j</td>
     </tr>`;
   });
   catHtml += '</tbody></table>';
@@ -1176,23 +1227,25 @@ async function renderHistorique(el) {
   Object.entries(byStatut).sort((a,b) => b[1]-a[1]).forEach(([s,n]) => {
     const suivi = suiviFromPwise(s);
     const color = {demarrage:"var(--green)",repondu:"var(--amber)",clos:"var(--gray)",encours:"var(--blue)"}[suivi]||"var(--gray)";
+    const pct = Math.round(n/total*100);
     statutHtml += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc">
-      <div style="width:14px;height:14px;border-radius:50%;background:${color};flex-shrink:0"></div>
+      <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
       <div style="flex:1;font-size:12px">${s}</div>
-      <div style="font-weight:700;font-size:13px">${n}</div>
+      <div style="font-weight:700;font-size:13px;min-width:24px;text-align:right">${n}</div>
+      <div style="font-size:10px;color:var(--text-light);min-width:30px">${pct}%</div>
     </div>`;
   });
 
   const selTag = histF.dept !== "Tous" ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="hist-dept-click" data-dept="">✕ ${histF.dept}</span>` : "";
 
   el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
-      <h1 style="font-size:24px;font-weight:800">📈 Historique AO</h1>
-      <span style="font-size:13px;color:var(--gray)">${histAOs.length} AO historiques</span>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <h1 style="font-size:24px;font-weight:800">📈 Historique Global</h1>
+      <span style="font-size:13px;color:var(--gray)">${histAOs.length} AO · tous périmètres</span>
     </div>
     <div class="filter-bar" style="margin-bottom:16px">
-      <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
-      <select id="hf_cat">${cats.map(c=>`<option value="${c}"${histF.cat===c?" selected":""}>${c==="Tous"?"Type profil":c}</option>`).join("")}</select>
+      <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Tous départements":d}</option>`).join("")}</select>
+      <select id="hf_cat">${cats.map(c=>`<option value="${c}"${histF.cat===c?" selected":""}>${c==="Tous"?"Tous profils":c}</option>`).join("")}</select>
       <select id="hf_statut">
         <option value="Tous"${histF.statut==="Tous"?" selected":""}>Tous statuts</option>
         <option value="demarrage"${histF.statut==="demarrage"?" selected":""}>🟢 Retenus</option>
@@ -1202,18 +1255,22 @@ async function renderHistorique(el) {
       </select>
       ${selTag}
     </div>
+
     <div class="kpi-grid" style="margin-bottom:20px">
-      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">AO analysés</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${soumis}</div><div class="kpi-label">Répondus / Soumis</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">Total AO</div><div class="kpi-sub">tous périmètres</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${encours}</div><div class="kpi-label">En cours</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${reponduSeulement}</div><div class="kpi-label">Soumis</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus ✓</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${nonRetenus}</div><div class="kpi-label">Non retenus</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</div><div class="kpi-label">Taux reçu→retenu</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${avgJours||"—"}</div><div class="kpi-label">Jours moy.</div><div class="kpi-sub">par mission</div></div>
     </div>
+
     <div class="dash-grid">
       <div class="card">
-        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer — % = taux retenu</span></div>
-        <div class="bar-chart">${deptHtml}</div>
+        <div class="card-title">🔄 Funnel global</div>
+        ${funnelHtml}
       </div>
       <div class="card">
         <div class="card-title">🏷️ Statuts PWise</div>
@@ -1222,13 +1279,17 @@ async function renderHistorique(el) {
     </div>
     <div class="dash-grid">
       <div class="card">
-        <div class="card-title">🔷 Par domaine (top 15) <span style="font-size:11px;color:var(--text-light)">% = taux retenu</span></div>
-        <div class="bar-chart">${domHtml}</div>
+        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer — % taux retenu — barre verte = retenus</span></div>
+        <div class="bar-chart">${deptHtml}</div>
       </div>
       <div class="card">
-        <div class="card-title">🎯 Par type profil</div>
-        ${catHtml}
+        <div class="card-title">🔷 Par domaine (top 15) <span style="font-size:11px;color:var(--text-light)">% taux retenu</span></div>
+        <div class="bar-chart">${domHtml}</div>
       </div>
+    </div>
+    <div class="card">
+      <div class="card-title">🎯 Par type profil</div>
+      ${catHtml}
     </div>`;
 
   document.getElementById("hf_dept").addEventListener("change", e => { histF.dept = e.target.value; renderHistorique(el); });
@@ -1238,7 +1299,6 @@ async function renderHistorique(el) {
     btn.addEventListener("click", () => { histF.dept = btn.dataset.dept || "Tous"; renderHistorique(el); });
   });
 }
-
 // ===================== IMPORT =====================
 function renderImport(el) {
   el.innerHTML = `
