@@ -1366,11 +1366,12 @@ function renderImport(el) {
     if (!raw) { alert("Collez d'abord le texte PWise historique."); return; }
     const btn = document.getElementById("run-hist-import");
     btn.textContent = "⏳ Import en cours..."; btn.disabled = true;
-    const { added, skipped } = await importHistorique(raw);
+    const { added, updated, skipped } = await importHistorique(raw);
     btn.textContent = "🚀 Importer en Historique"; btn.disabled = false;
     document.getElementById("hist-result").innerHTML = `
       <div class="import-ok" style="margin-top:12px">
-        ✅ <strong>${added} AO historiques importés</strong>${skipped ? ` · ${skipped} ignorés (déjà présents comme AO actifs)` : ""}
+        ✅ Import historique terminé<br>
+        🆕 ${added} nouveaux · ♻️ ${updated} retaggés comme historiques · ⏭️ ${skipped} ignorés (suivi actif)
         <br><span style="font-size:12px">→ <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir la page Historique</a></span>
       </div>`;
   });
@@ -1443,26 +1444,47 @@ function renderImport(el) {
 
 async function importHistorique(raw) {
   const parsed = parseAOs(raw);
-  if (!parsed.length) return { added: 0, skipped: 0 };
+  if (!parsed.length) return { added: 0, updated: 0, skipped: 0 };
   const existing = await dbGetAll("aos");
-  const existingRFCs = new Set(existing.map(a => a.rfc));
-  const toSave = parsed
-    .filter(p => !existingRFCs.has(p.rfc)) // ne pas écraser les AOs live
-    .map(p => {
-      const suivi = suiviFromPwise(p.statutPwise);
-      return {
-        ...p,
-        isHistorique: true,
+  const existingMap = {};
+  existing.forEach(a => { existingMap[a.rfc] = a; });
+
+  const toSave = [];
+  let added = 0, updated = 0, skipped = 0;
+
+  parsed.forEach(p => {
+    const ex = existingMap[p.rfc];
+    const suivi = suiviFromPwise(p.statutPwise);
+
+    if (!ex) {
+      // Nouveau — créer comme historique
+      toSave.push({
+        ...p, isHistorique: true,
         statut: suivi === "clos" ? "clos" : "ouvert",
         dateCloture: suivi === "clos" ? (p.dateDebut || today()) : "",
         dateReponse: ["repondu","demarrage"].includes(suivi) ? (p.dateDebut || today()) : "",
         dateDemarrage: suivi === "demarrage" ? (p.dateDebut || today()) : "",
-        bm: "", consultant: "", tjm: "", notes: "",
-        dateCreation: today(), dateOuverture: today(), dateDisparition: "", dernierImport: today()
-      };
-    });
-  await dbPutMany("aos", toSave);
-  return { added: toSave.length, skipped: parsed.length - toSave.length };
+        bm:"", consultant:"", tjm:"", notes:"",
+        dateCreation: today(), dateOuverture: today(), dateDisparition:"", dernierImport: today()
+      });
+      added++;
+    } else if (!ex.isHistorique && !ex.bm && !ex.datePrise) {
+      // Existe mais sans suivi INTM → retagger comme historique
+      toSave.push({...ex, isHistorique: true,
+        statut: suivi === "clos" ? "clos" : ex.statut,
+        dateCloture: suivi === "clos" && !ex.dateCloture ? (p.dateDebut || today()) : ex.dateCloture,
+        dateReponse: ["repondu","demarrage"].includes(suivi) && !ex.dateReponse ? (p.dateDebut || today()) : ex.dateReponse,
+        dateDemarrage: suivi === "demarrage" && !ex.dateDemarrage ? (p.dateDebut || today()) : ex.dateDemarrage,
+      });
+      updated++;
+    } else {
+      // AO avec suivi actif → ne pas toucher
+      skipped++;
+    }
+  });
+
+  if (toSave.length) await dbPutMany("aos", toSave);
+  return { added, updated, skipped };
 }
 
 async function loadImportHistory() {
