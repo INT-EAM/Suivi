@@ -244,6 +244,18 @@ async function dbPutMany(store, items) {
   } catch(e) { console.error("Supabase PUTMANY error:", e); }
 }
 
+async function dbDelete(rfc) {
+  // Memory
+  memoryStore.aos = memoryStore.aos.filter(a => a.rfc !== rfc);
+  if(!useSupabase) return;
+  // Supabase
+  try {
+    await fetch(SUPABASE_URL+"/rest/v1/appels_offres?rfc=eq."+encodeURIComponent(rfc), {
+      method:"DELETE", headers:sbHeaders()
+    });
+  } catch(e) { console.error("Supabase DELETE error:", e); }
+}
+
 // ===================== PARSER =====================
 function parseAOs(raw) {
   const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
@@ -972,6 +984,7 @@ function renderDetail(el, rfc) {
         <div class="form-actions">
           <button class="btn btn-green" id="save-detail">💾 Enregistrer</button>
           <button class="btn btn-red" id="clear-detail">🗑️ Effacer le suivi</button>
+          <button class="btn" id="delete-ao" style="margin-left:auto;color:#7f1d1d;border-color:#fecaca;background:#fff5f5" title="Supprime définitivement cet AO de la base">🗑️ Supprimer l'AO</button>
         </div>
       </div>
     </div>
@@ -1005,6 +1018,13 @@ function renderDetail(el, rfc) {
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
     ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
     await dbPut("aos", ao);
+    renderView();
+  });
+  document.getElementById("delete-ao").addEventListener("click",async()=>{
+    if(!confirm("⚠️ Supprimer définitivement "+ao.rfc+" ?\n\nCet AO sera effacé de la base et n'apparaîtra plus, même après import PWise.\n\nCette action est irréversible.")) return;
+    await dbDelete(ao.rfc);
+    selectedRFC = null;
+    allAOs = allAOs.filter(a => a.rfc !== ao.rfc);
     renderView();
   });
 }
