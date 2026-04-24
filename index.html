@@ -174,6 +174,7 @@ td.r { text-align: right; }
     </div>
     <div class="nav-item active" data-view="dashboard"><span class="icon">📊</span> Dashboard <span class="nav-badge" id="nav-count">0</span></div>
     <div class="nav-item" data-view="liste"><span class="icon">📋</span> Appels d'offres</div>
+    <div class="nav-item" data-view="historique"><span class="icon">📈</span> Historique</div>
     <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
     <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
     <div style="position:absolute;bottom:16px;left:0;right:0;padding:0 20px">
@@ -273,7 +274,8 @@ function parseAOs(raw) {
         j++;
       }
       let profil="",modalite="",dateDebut="",dateFin="",nbJours=0;
-      if(j<lines.length&&lines[j]==="btnMasterDetail"){
+      // Bloc détail = second btnMasterDetail NOT suivi d'un RFC (sinon c'est le prochain AO)
+      if(j<lines.length && lines[j]==="btnMasterDetail" && (j+1>=lines.length || !/^RFC\d+/.test(lines[j+1]))) {
         j++;if(j<lines.length){profil=lines[j];j++;}
         while(j<lines.length&&lines[j]!=="btnMasterDetail"){
           if(["Sur Site","Télétravail","Hybride"].includes(lines[j]))modalite=lines[j];
@@ -284,6 +286,8 @@ function parseAOs(raw) {
           j++;
         }
       }
+      // Si pas de profil (format liste seul), utiliser l'intitulé comme fallback
+      if(!profil && intitule) profil = intitule;
       if(rfc)aos.push({rfc,tm,intitule,org,dept,statutPwise,profil,modalite,dateDebut,dateFin,nbJours});
       i=j;
     } else i++;
@@ -378,14 +382,23 @@ function periodFilter(dateStr, period) {
 
 // ===================== STATE =====================
 let allAOs = [];
+let histAOs = [];
 let currentView = "dashboard";
 let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
 let sort = { col:"dateDebut", dir:1 };
 let selectedRFC = null;
 
-// Chargement avec exclusion des domaines non gérés par cette équipe
+// Chargement avec exclusion des domaines non gérés + AO historiques séparés
 async function loadAOs() {
-  allAOs = (await dbGetAll("aos")).filter(a => !EXCLUDED_DOMAINS.includes(domainGroup(a.org)));
+  const all = await dbGetAll("aos");
+  allAOs = all
+    .filter(a => !EXCLUDED_DOMAINS.includes(domainGroup(a.org)))
+    .filter(a => !a.isHistorique);
+}
+
+async function loadHistoricalAOs() {
+  const all = await dbGetAll("aos");
+  histAOs = all.filter(a => a.isHistorique); // tous périmètres inclus
 }
 
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
@@ -427,6 +440,7 @@ async function renderView() {
     const main = document.getElementById("main-content");
     if(currentView==="dashboard") renderDashboard(main);
     else if(currentView==="liste") renderListe(main);
+    else if(currentView==="historique") renderHistorique(main);
     else if(currentView==="import") renderImport(main);
     else if(currentView==="export") renderExport(main);
   } catch(e) {
@@ -1029,6 +1043,202 @@ function renderDetail(el, rfc) {
   });
 }
 
+// ===================== HISTORIQUE =====================
+let histF = { dept: "Tous", cat: "Tous", statut: "Tous" };
+
+function suiviFromPwise(sp) {
+  if (!sp) return "encours";
+  if (/non retenu/i.test(sp)) return "clos";
+  if (/retenu/i.test(sp)) return "demarrage";
+  if (/soumis/i.test(sp)) return "repondu";
+  return "encours";
+}
+
+async function renderHistorique(el) {
+  await loadHistoricalAOs();
+  if (!histAOs.length) {
+    el.innerHTML = `
+      <h1 style="font-size:24px;font-weight:800;margin-bottom:16px">📈 Historique</h1>
+      <div class="card" style="text-align:center;padding:40px">
+        <div style="font-size:48px;margin-bottom:16px">📭</div>
+        <h3 style="margin-bottom:8px">Aucune donnée historique</h3>
+        <p style="color:var(--gray);font-size:13px;margin-bottom:20px">Importez l'extraction PWise via la section "Import Historique" dans Import PWise.</p>
+        <button class="btn btn-green" onclick="navigate('import')">📥 Aller à l'import</button>
+      </div>`;
+    return;
+  }
+
+  const depts = ["Tous", ...new Set(histAOs.map(a => a.dept).filter(Boolean))].sort();
+  const cats  = ["Tous", ...new Set(histAOs.map(a => categorize(a.profil)))];
+
+  // Filtrage
+  let f = [...histAOs];
+  if (histF.dept !== "Tous") f = f.filter(a => a.dept === histF.dept);
+  if (histF.cat  !== "Tous") f = f.filter(a => categorize(a.profil) === histF.cat);
+  if (histF.statut !== "Tous") {
+    if (histF.statut === "demarrage") f = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage");
+    else if (histF.statut === "clos") f = f.filter(a => suiviFromPwise(a.statutPwise) === "clos");
+    else if (histF.statut === "repondu") f = f.filter(a => suiviFromPwise(a.statutPwise) === "repondu");
+    else if (histF.statut === "encours") f = f.filter(a => suiviFromPwise(a.statutPwise) === "encours");
+  }
+
+  const total     = f.length;
+  const soumis    = f.filter(a => ["repondu","qualif","demarrage"].includes(suiviFromPwise(a.statutPwise))).length;
+  const retenus   = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage").length;
+  const nonRetenus= f.filter(a => suiviFromPwise(a.statutPwise) === "clos").length;
+  const tauxGlobal= total ? Math.round(retenus / total * 100) : 0;
+  const tauxSoumis= soumis ? Math.round(retenus / soumis * 100) : 0;
+
+  // Par entité
+  const byDept = {};
+  f.forEach(a => {
+    const d = a.dept || "—";
+    if (!byDept[d]) byDept[d] = { total: 0, soumis: 0, retenu: 0, clos: 0 };
+    byDept[d].total++;
+    const s = suiviFromPwise(a.statutPwise);
+    if (["repondu","demarrage"].includes(s)) byDept[d].soumis++;
+    if (s === "demarrage") byDept[d].retenu++;
+    if (s === "clos") byDept[d].clos++;
+  });
+  const deptEntries = Object.entries(byDept).sort((a,b) => b[1].total - a[1].total);
+
+  // Par domaine (top 15)
+  const byDomain = {};
+  f.forEach(a => {
+    const d = domainGroup(a.org) || "—";
+    if (!byDomain[d]) byDomain[d] = { total: 0, retenu: 0, clos: 0 };
+    byDomain[d].total++;
+    const s = suiviFromPwise(a.statutPwise);
+    if (s === "demarrage") byDomain[d].retenu++;
+    if (s === "clos") byDomain[d].clos++;
+  });
+  const domainEntries = Object.entries(byDomain).sort((a,b) => b[1].total - a[1].total).slice(0, 15);
+
+  // Par type profil
+  const byCat = {};
+  f.forEach(a => {
+    const c = categorize(a.profil);
+    if (!byCat[c]) byCat[c] = { total: 0, retenu: 0, clos: 0 };
+    byCat[c].total++;
+    const s = suiviFromPwise(a.statutPwise);
+    if (s === "demarrage") byCat[c].retenu++;
+    if (s === "clos") byCat[c].clos++;
+  });
+
+  // Statuts PWise bruts
+  const byStatut = {};
+  f.forEach(a => { const s = a.statutPwise||"—"; byStatut[s] = (byStatut[s]||0) + 1; });
+
+  // ── HTML ──
+  const maxDept = deptEntries.length ? deptEntries[0][1].total : 1;
+  const maxDom  = domainEntries.length ? domainEntries[0][1].total : 1;
+
+  let deptHtml = '';
+  deptEntries.forEach(([d, s]) => {
+    const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+    const selD = histF.dept === d;
+    deptHtml += `<div class="bar-row dash-click hist-dept-click" data-dept="${d}" style="cursor:pointer;${selD?"outline:2px solid var(--green);border-radius:6px;":""}">
+      <div class="bar-label" title="${d}" style="width:160px">${d}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDept*100)}%;background:${selD?"var(--green)":"var(--blue)"}">
+        <span style="font-size:10px">${s.total}</span>
+      </div></div>
+      <div style="width:24px;text-align:right;font-size:11px;font-weight:600;color:var(--green)">${taux}%</div>
+    </div>`;
+  });
+
+  let domHtml = '';
+  domainEntries.forEach(([d, s]) => {
+    const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+    domHtml += `<div class="bar-row">
+      <div class="bar-label" title="${d}">${d}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDom*100)}%;background:var(--purple)">
+        <span style="font-size:10px">${s.total}</span>
+      </div></div>
+      <div style="width:24px;text-align:right;font-size:11px;font-weight:600;color:var(--purple)">${taux}%</div>
+    </div>`;
+  });
+
+  let catHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
+  catHtml += '<th style="text-align:left;padding:5px 8px">Type profil</th><th style="text-align:center">Reçus</th><th style="text-align:center">Retenus</th><th style="text-align:center">Non retenus</th><th style="text-align:center">Taux</th></tr></thead><tbody>';
+  Object.entries(byCat).sort((a,b) => b[1].total - a[1].total).forEach(([c,s]) => {
+    const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+    catHtml += `<tr style="border-bottom:1px solid #f8fafc">
+      <td style="padding:5px 8px"><span class="badge" style="background:${CAT_COLORS[c]}">${c}</span></td>
+      <td style="text-align:center;font-weight:700">${s.total}</td>
+      <td style="text-align:center;color:var(--green);font-weight:600">${s.retenu}</td>
+      <td style="text-align:center;color:var(--gray)">${s.clos}</td>
+      <td style="text-align:center;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</td>
+    </tr>`;
+  });
+  catHtml += '</tbody></table>';
+
+  let statutHtml = '';
+  Object.entries(byStatut).sort((a,b) => b[1]-a[1]).forEach(([s,n]) => {
+    const suivi = suiviFromPwise(s);
+    const color = {demarrage:"var(--green)",repondu:"var(--amber)",clos:"var(--gray)",encours:"var(--blue)"}[suivi]||"var(--gray)";
+    statutHtml += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc">
+      <div style="width:14px;height:14px;border-radius:50%;background:${color};flex-shrink:0"></div>
+      <div style="flex:1;font-size:12px">${s}</div>
+      <div style="font-weight:700;font-size:13px">${n}</div>
+    </div>`;
+  });
+
+  const selTag = histF.dept !== "Tous" ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="hist-dept-click" data-dept="">✕ ${histF.dept}</span>` : "";
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <h1 style="font-size:24px;font-weight:800">📈 Historique AO</h1>
+      <span style="font-size:13px;color:var(--gray)">${histAOs.length} AO historiques</span>
+    </div>
+    <div class="filter-bar" style="margin-bottom:16px">
+      <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
+      <select id="hf_cat">${cats.map(c=>`<option value="${c}"${histF.cat===c?" selected":""}>${c==="Tous"?"Type profil":c}</option>`).join("")}</select>
+      <select id="hf_statut">
+        <option value="Tous"${histF.statut==="Tous"?" selected":""}>Tous statuts</option>
+        <option value="demarrage"${histF.statut==="demarrage"?" selected":""}>🟢 Retenus</option>
+        <option value="repondu"${histF.statut==="repondu"?" selected":""}>🟡 Soumis</option>
+        <option value="clos"${histF.statut==="clos"?" selected":""}>⚫ Non retenus</option>
+        <option value="encours"${histF.statut==="encours"?" selected":""}>🔵 En cours</option>
+      </select>
+      ${selTag}
+    </div>
+    <div class="kpi-grid" style="margin-bottom:20px">
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">AO analysés</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${soumis}</div><div class="kpi-label">Répondus / Soumis</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${nonRetenus}</div><div class="kpi-label">Non retenus</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</div><div class="kpi-label">Taux reçu→retenu</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div></div>
+    </div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer — % = taux retenu</span></div>
+        <div class="bar-chart">${deptHtml}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏷️ Statuts PWise</div>
+        ${statutHtml}
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-title">🔷 Par domaine (top 15) <span style="font-size:11px;color:var(--text-light)">% = taux retenu</span></div>
+        <div class="bar-chart">${domHtml}</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🎯 Par type profil</div>
+        ${catHtml}
+      </div>
+    </div>`;
+
+  document.getElementById("hf_dept").addEventListener("change", e => { histF.dept = e.target.value; renderHistorique(el); });
+  document.getElementById("hf_cat").addEventListener("change",  e => { histF.cat  = e.target.value; renderHistorique(el); });
+  document.getElementById("hf_statut").addEventListener("change", e => { histF.statut = e.target.value; renderHistorique(el); });
+  document.querySelectorAll(".hist-dept-click").forEach(btn => {
+    btn.addEventListener("click", () => { histF.dept = btn.dataset.dept || "Tous"; renderHistorique(el); });
+  });
+}
+
 // ===================== IMPORT =====================
 function renderImport(el) {
   el.innerHTML = `
@@ -1049,6 +1259,23 @@ function renderImport(el) {
     </div>
     <div id="import-result"></div>
     <div id="import-history"></div>
+
+    <div class="card" style="margin-top:20px;border-color:#e0e7ff">
+      <div class="card-title" style="color:var(--blue)">📈 Import Historique PWise</div>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
+        Importez l'extraction complète PWise (10 pages) pour alimenter la page Historique.<br>
+        <strong>Ces AOs sont stockés séparément</strong> — ils n'apparaissent pas dans le Dashboard ni dans les Appels d'offres actifs.
+      </p>
+      <textarea id="hist-text" style="width:100%;height:160px;border:1px solid #c7d2fe;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le contenu de pwise_export_full.txt..."></textarea>
+      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+        <button class="btn" id="run-hist-import" style="background:var(--blue);color:#fff;border-color:var(--blue)">🚀 Importer en Historique</button>
+        <span style="color:var(--gray);font-size:12px">ou</span>
+        <label class="btn" style="cursor:pointer">📎 Charger pwise_export_full.txt
+          <input type="file" id="hist-file" accept=".txt" style="display:none">
+        </label>
+      </div>
+      <div id="hist-result"></div>
+    </div>
   `;
 
   document.getElementById("import-file").addEventListener("change",e=>{
@@ -1057,6 +1284,28 @@ function renderImport(el) {
     const reader=new FileReader();
     reader.onload=ev=>{document.getElementById("import-text").value=ev.target.result;};
     reader.readAsText(file);
+  });
+
+  // Import historique
+  document.getElementById("hist-file").addEventListener("change", e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { document.getElementById("hist-text").value = ev.target.result; };
+    reader.readAsText(file);
+  });
+
+  document.getElementById("run-hist-import").addEventListener("click", async () => {
+    const raw = document.getElementById("hist-text").value.trim();
+    if (!raw) { alert("Collez d'abord le texte PWise historique."); return; }
+    const btn = document.getElementById("run-hist-import");
+    btn.textContent = "⏳ Import en cours..."; btn.disabled = true;
+    const { added, skipped } = await importHistorique(raw);
+    btn.textContent = "🚀 Importer en Historique"; btn.disabled = false;
+    document.getElementById("hist-result").innerHTML = `
+      <div class="import-ok" style="margin-top:12px">
+        ✅ <strong>${added} AO historiques importés</strong>${skipped ? ` · ${skipped} ignorés (déjà présents comme AO actifs)` : ""}
+        <br><span style="font-size:12px">→ <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir la page Historique</a></span>
+      </div>`;
   });
 
   document.getElementById("run-import").addEventListener("click", async()=>{
@@ -1123,6 +1372,30 @@ function renderImport(el) {
   });
 
   loadImportHistory();
+}
+
+async function importHistorique(raw) {
+  const parsed = parseAOs(raw);
+  if (!parsed.length) return { added: 0, skipped: 0 };
+  const existing = await dbGetAll("aos");
+  const existingRFCs = new Set(existing.map(a => a.rfc));
+  const toSave = parsed
+    .filter(p => !existingRFCs.has(p.rfc)) // ne pas écraser les AOs live
+    .map(p => {
+      const suivi = suiviFromPwise(p.statutPwise);
+      return {
+        ...p,
+        isHistorique: true,
+        statut: suivi === "clos" ? "clos" : "ouvert",
+        dateCloture: suivi === "clos" ? (p.dateDebut || today()) : "",
+        dateReponse: ["repondu","demarrage"].includes(suivi) ? (p.dateDebut || today()) : "",
+        dateDemarrage: suivi === "demarrage" ? (p.dateDebut || today()) : "",
+        bm: "", consultant: "", tjm: "", notes: "",
+        dateCreation: today(), dateOuverture: today(), dateDisparition: "", dernierImport: today()
+      };
+    });
+  await dbPutMany("aos", toSave);
+  return { added: toSave.length, skipped: parsed.length - toSave.length };
 }
 
 async function loadImportHistory() {
