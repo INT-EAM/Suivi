@@ -186,9 +186,11 @@ td.r { text-align: right; }
 
 <script>
 // ===================== CONFIGURATION SUPABASE =====================
-// ⚠️ Remplacez par vos valeurs Supabase (Settings > API)
 const SUPABASE_URL = "https://tjlrhacczpdtgtiutjlm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqbHJoYWNjenBkdGd0aXV0amxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzcxNTIsImV4cCI6MjA5MTI1MzE1Mn0.iBBvWvBtVHWf6s9eRb1cF9TgDqWBdl_8Bc3y6KH8lA4";
+
+// Domaines exclus (équipe non utilisatrice de l'outil)
+const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
 
 // ===================== BASE DE DONNÉES =====================
 let memoryStore = { aos: [], imports: [] };
@@ -215,11 +217,9 @@ async function dbGetAll(store) {
 }
 
 async function dbPut(store, data) {
-  // Memory
   if(store==="aos"){const i=memoryStore.aos.findIndex(a=>a.rfc===data.rfc);if(i>=0)memoryStore.aos[i]=data;else memoryStore.aos.push(data);}
   else memoryStore.imports.push(data);
   if(!useSupabase) return;
-  // Supabase
   try {
     const table = store==="aos"?"appels_offres":"imports";
     const body = store==="aos" ? {rfc:data.rfc, data:data} : {data:data};
@@ -230,11 +230,9 @@ async function dbPut(store, data) {
 }
 
 async function dbPutMany(store, items) {
-  // Memory
   if(store==="aos") items.forEach(item=>{const i=memoryStore.aos.findIndex(a=>a.rfc===item.rfc);if(i>=0)memoryStore.aos[i]=item;else memoryStore.aos.push(item);});
   else memoryStore.imports.push(...items);
   if(!useSupabase) return;
-  // Supabase batch upsert
   try {
     const table = store==="aos"?"appels_offres":"imports";
     const body = store==="aos"
@@ -373,7 +371,10 @@ let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all",
 let sort = { col:"dateDebut", dir:1 };
 let selectedRFC = null;
 
-async function loadAOs() { allAOs = await dbGetAll("aos"); }
+// Chargement avec exclusion des domaines non gérés par cette équipe
+async function loadAOs() {
+  allAOs = (await dbGetAll("aos")).filter(a => !EXCLUDED_DOMAINS.includes(domainGroup(a.org)));
+}
 
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
@@ -422,7 +423,6 @@ async function renderView() {
 }
 
 // ===================== DASHBOARD =====================
-// Dashboard filter state
 let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null, periodView:"month" };
 
 function dashFilteredAOs() {
@@ -456,7 +456,6 @@ function renderDashboard(el) {
   const nonTraite=filtered.filter(a=>statutSuivi(a)==="ouvert").length;
   const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
 
-  // Compute data for each chart based on OTHER filters (exclude own dimension)
   function subFilter(exclude) {
     let f=all;
     if(exclude!=="dept" && dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
@@ -474,13 +473,11 @@ function renderDashboard(el) {
     return f;
   }
 
-  // Départements (+ domaines en drilldown)
   const deptData = subFilter("dept");
   const byDept={}; deptData.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
   const deptEntries=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
   const maxDept=deptEntries.length?deptEntries[0][1]:1;
 
-  // Domaines (si un dept est sélectionné)
   let domainEntries=[], maxDomain=1;
   if(dashF.dept) {
     const domData=subFilter("domain").filter(a=>a.dept===dashF.dept);
@@ -489,18 +486,14 @@ function renderDashboard(el) {
     maxDomain=domainEntries.length?domainEntries[0][1]:1;
   }
 
-  // Managers
   const bmData=subFilter("bm");
   const byBM={}; bmData.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
   const bmEntries=Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
   const maxBM=bmEntries.length?bmEntries[0][1]:1;
 
-  // Catégories
   const catData=subFilter("cat");
   const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
 
-  // Build funnel HTML — exclusive categories (each AO counts once)
-  // Total reçu includes clos
   const fClosNT=allAOs.filter(a=>{
     if(a.statut!=="clos"||hasTraitement(a)) return false;
     if(dashF.dept&&a.dept!==dashF.dept) return false;
@@ -517,7 +510,6 @@ function renderDashboard(el) {
     if(dashF.cat&&categorize(a.profil)!==dashF.cat) return false;
     return true;
   }).length;
-  // Exclusive open counts
   const fDem=filtered.filter(a=>a.dateDemarrage).length;
   const fQualifOnly=filtered.filter(a=>a.dateQualif&&!a.dateDemarrage).length;
   const fReponduOnly=filtered.filter(a=>a.dateReponse&&!a.dateQualif).length;
@@ -553,9 +545,7 @@ function renderDashboard(el) {
   funnelHtml+='</div>';
   if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)</div>';
 
-  // Build manager table HTML — includes clos traités
   const mgrData={};
-  // Use all AOs with current cross-filters (not just open)
   const mgrSource = allAOs.filter(a=>{
     if(dashF.dept && a.dept!==dashF.dept) return false;
     if(dashF.domain && domainGroup(a.org)!==dashF.domain) return false;
@@ -610,7 +600,6 @@ function renderDashboard(el) {
     mgrHtml+='</tbody></table>';
   }
 
-  // Build dept/domain chart HTML
   let deptChartHtml='';
   if(dashF.dept){
     domainEntries.forEach(([d,n])=>{
@@ -629,7 +618,6 @@ function renderDashboard(el) {
     });
   }
 
-  // Build BM chart HTML
   let bmChartHtml='';
   bmEntries.forEach(([bm,n])=>{
     const sel=dashF.bm===bm;
@@ -638,15 +626,12 @@ function renderDashboard(el) {
     bmChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxBM*100)+'%;background:'+(sel?"var(--green)":"var(--blue)")+'">'+n+'</div></div></div>';
   });
 
-  // Build cat badges HTML
   let catHtml='';
   Object.entries(byCat).forEach(([c,n])=>{
     const sel=dashF.cat===c;
     catHtml+='<span class="badge dash-click" data-key="cat" data-val="'+c+'" style="background:'+CAT_COLORS[c]+';font-size:12px;padding:6px 14px;cursor:pointer;'+(sel?"outline:2px solid #333;outline-offset:2px;":"")+'">'+c+': '+n+'</span> ';
   });
 
-  // Tags HTML
-  // Active filter tags
   const tags=[];
   if(dashF.dept) tags.push({k:"dept",v:dashF.dept});
   if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
@@ -663,10 +648,9 @@ function renderDashboard(el) {
     tagsHtml+='</div>';
   }
 
-  // Build period activity table with per-period per-manager data
   const pMode=dashF.periodView||"month";
   const periodBuckets={};
-  const periodByBM={}; // periodKey → { bmName → {recu,repondu,qualif,demarrage,clos} }
+  const periodByBM={};
   allAOs.forEach(a=>{
     if(dashF.dept && a.dept!==dashF.dept) return;
     if(dashF.domain && domainGroup(a.org)!==dashF.domain) return;
@@ -717,10 +701,8 @@ function renderDashboard(el) {
       periodHtml+='<td style="text-align:center;color:var(--gray)">'+b.clos+'</td>';
       periodHtml+='<td style="text-align:center;font-weight:600;color:'+(taux>=15?"var(--green)":"var(--amber)")+'">'+taux+'%</td>';
       periodHtml+='</tr>';
-      // Hidden sub-table placeholder
       periodHtml+='<tr class="period-detail" data-pk="'+pk+'" style="display:none"><td colspan="7" style="padding:0"></td></tr>';
     });
-    // Totaux
     const totals=periodEntries.reduce((t,[,b])=>({recu:t.recu+b.recu,repondu:t.repondu+b.repondu,qualif:t.qualif+b.qualif,demarrage:t.demarrage+b.demarrage,clos:t.clos+b.clos}),{recu:0,repondu:0,qualif:0,demarrage:0,clos:0});
     const tauxTotal=totals.recu?Math.round(totals.demarrage/totals.recu*100):0;
     periodHtml+='<tr style="border-top:2px solid var(--border);font-weight:700">';
@@ -762,13 +744,11 @@ function renderDashboard(el) {
     +'<div class="card"><div class="card-title">📅 Activité par période</div>'+periodHtml+'</div>'
     +(dashHasFilters()?'<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des '+total+' AO filtrés</button></div>':"");
 
-  // Bind events
   document.querySelectorAll(".dash-click").forEach(el=>{
     el.addEventListener("click",()=>{
       const k=el.dataset.key, v=el.dataset.val;
-      if(dashF[k]===v) dashF[k]=null; // toggle off
+      if(dashF[k]===v) dashF[k]=null;
       else dashF[k]=v;
-      // If changing dept, reset domain
       if(k==="dept") dashF.domain=null;
       renderDashboard(document.getElementById("main-content"));
     });
@@ -797,7 +777,6 @@ function renderDashboard(el) {
     navigate("liste");
   });
 
-  // Clos KPI → ouvre la liste filtrée sur les clos
   const closKpi=document.getElementById("kpi-clos");
   if(closKpi) closKpi.addEventListener("click",()=>{
     filters.statut="clos_nontraite";
@@ -811,7 +790,6 @@ function renderDashboard(el) {
     navigate("liste");
   });
 
-  // Period view selector
   document.querySelectorAll(".period-btn").forEach(btn=>{
     btn.addEventListener("click",()=>{
       dashF.periodView=btn.dataset.period;
@@ -819,24 +797,20 @@ function renderDashboard(el) {
     });
   });
 
-  // Period row click → expand manager detail
   document.querySelectorAll(".period-row").forEach(row=>{
     row.addEventListener("click",()=>{
       const pk=row.dataset.pk;
       const detailRow=document.querySelector('.period-detail[data-pk="'+pk+'"]');
       if(!detailRow) return;
-      // Toggle
       if(detailRow.style.display!=="none"){
         detailRow.style.display="none";
         row.querySelector("td").textContent="▸ "+periodLabel(pk,window._periodMode);
         return;
       }
-      // Collapse others
       document.querySelectorAll(".period-detail").forEach(d=>d.style.display="none");
       document.querySelectorAll(".period-row td:first-child").forEach(td=>{
         if(td.textContent.startsWith("▾")) td.textContent="▸"+td.textContent.slice(1);
       });
-      // Expand this one
       row.querySelector("td").textContent="▾ "+periodLabel(pk,window._periodMode);
       const bmData=window._periodByBM[pk]||{};
       const bmEntries=Object.entries(bmData).sort((a,b)=>b[1].recu-a[1].recu);
@@ -935,7 +909,6 @@ function renderListe(el) {
     <div id="detail-area"></div>
   `;
 
-  // Bind filters
   document.getElementById("f_search").addEventListener("input",e=>{filters.search=e.target.value;renderListe(el);});
   document.getElementById("f_dept").addEventListener("change",e=>{filters.dept=e.target.value;renderListe(el);});
   document.getElementById("f_cat").addEventListener("change",e=>{filters.cat=e.target.value;renderListe(el);});
@@ -1080,14 +1053,12 @@ function renderImport(el) {
     let added=0, updated=0, closed=0, unchanged=0;
     const toSave = [];
 
-    // Add/update
     parsed.forEach(p=>{
       const ex = existingMap[p.rfc];
       if(!ex){
         toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()});
         added++;
       } else {
-        // Update PWise fields, keep tracking
         let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
         const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport:today(),
           bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
@@ -1097,27 +1068,22 @@ function renderImport(el) {
       }
     });
 
-    // Close missing — with grace period for responded AOs
     let pending=0;
     existing.forEach(ex=>{
       if(ex.statut==="clos"||importedRFCs.has(ex.rfc)) return;
-      // AO has been responded to → grace period of 30 days
       if(ex.dateReponse) {
         const dispDate = ex.dateDisparition || today();
         const daysSinceDisp = Math.round((new Date() - new Date(dispDate)) / 86400000);
         if(daysSinceDisp < 30) {
-          // Keep open but mark as "disappeared"
           toSave.push({...ex, dateDisparition: ex.dateDisparition || today(), dernierImport:today()});
           pending++;
           return;
         }
-        // 30+ days gone → close
       }
       toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
       closed++;
     });
 
-    // AOs that reappear → clear dateDisparition
     parsed.forEach(p=>{
       const saved = toSave.find(s=>s.rfc===p.rfc);
       if(saved && saved.dateDisparition) saved.dateDisparition="";
@@ -1174,7 +1140,6 @@ function renderExport(el) {
     const now=new Date();
     const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
 
-    // Stats
     const total=open.length;
     const nonTraite=open.filter(a=>statutSuivi(a)==="ouvert").length;
     const reponduSemaine=open.filter(a=>a.dateReponse&&new Date(a.dateReponse)>=weekAgo).length;
@@ -1184,7 +1149,6 @@ function renderExport(el) {
     const totalQualif=open.filter(a=>a.dateQualif).length;
     const totalDem=open.filter(a=>a.dateDemarrage).length;
 
-    // Par BM
     const bms={};
     open.forEach(a=>{
       const bm=a.bm;if(!bm)return;
@@ -1196,12 +1160,8 @@ function renderExport(el) {
       if(a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo) bms[bm].demSem++;
     });
 
-    // AO urgents
     const urgents=open.filter(a=>urgency(a.dateDebut)>=2&&statutSuivi(a)==="ouvert");
-
-    // AO avec notes récentes
     const avecNotes=open.filter(a=>a.notes).slice(0,5);
-
     const dateStr=now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 
     let report=`📊 RAPPORT HEBDO AO BCEF — ${dateStr}
@@ -1285,17 +1245,19 @@ function download(filename, content, type){
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();
 }
 
-// ===================== SEED — Import initial automatique =====================
-const SEED=`btnMasterDetail\nRFC00004114\nBCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))\nTM00004671\nL6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nProject Manager Risques IT & Cyber Sécurité Niveau 2\nSur Site\n13/04/2026 - 31/12/2026\n151,00\nbtnMasterDetail\nRFC00004045\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004676\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00004038\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004675\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003897\nBCEF IT MDEP Nantes Intégrateur squad Xpay Estreem\nTM00004484\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003890\nBCEF IT - Business Analyst Socle Data DHV2 (CS)\nTM00004420\nL6_BCEF IT - 2DAI 2 DATA IA\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003863\nBCEF IT - BA - Crédits Pro ER (MCS)\nTM00004311\nL6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003855\nBCEF IT-DIFA 2-MBE Tech Lead Socle MBE (CS)\nTM00004407\nL6_BCEF IT - DIFA 2 ASSETS DIGITAUX CORPORATE ET TRANSVERSAUX\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nExpert Technique Niveau 1\nSur Site\n15/04/2026 - 31/12/2026\n150,00\nbtnMasterDetail\nRFC00003835\nBCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2\nTM00004167\nL6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003827\nBCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2\nTM00004150\nL6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 3\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003797\nBCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)\nTM00004273\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003728\n[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO\nTM00004424\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/10/2026\n130,00\nbtnMasterDetail\nRFC00003679\nBCEF IT - Assurance vie - Gestion de projet (MCS)\nTM00004330\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003672\nBCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte\nTM00004274\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n03/06/2026 - 31/12/2026\n124,00\nbtnMasterDetail\nRFC00003642\nBCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK\nTM00003799\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nBCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA\nSur Site\n13/04/2026 - 30/09/2026\n118,00\nbtnMasterDetail\nRFC00003372\nBCEF IT - CBO - Analyse de Test - Contrat d Offres (CLA)\nTM00003975\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n30/03/2026 - 31/12/2026\n159,00\nbtnMasterDetail\nRFC00003355\nChargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)\nTM00003847\nL6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n06/04/2026 - 30/09/2026\n122,00\nbtnMasterDetail\nRFC00003294\nBCEF IT - CP Senior Mise en oeuvre exigences DCC2 - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)\nTM00004067\nL6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n01/04/2026 - 30/06/2026\n50,00\nbtnMasterDetail\nRFC00003018\nBCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java\nTM00003880\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n06/04/2026 - 31/12/2026\n155,00\nbtnMasterDetail\nRFC00002985\nBCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)\nTM00001894\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n02/03/2026 - 31/12/2026\n175,00\nbtnMasterDetail\nRFC00001175\nBCEF IT - OSBA4 - Epargne - BA - Reporting Transverses\nTM00001974\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00000929\nBCEF IT Projet Gestion Sous Mandat (CLA)\nTM00001888\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n16/03/2026 - 31/12/2026\n167,00`;
+// ===================== SEED =====================
+const SEED=`btnMasterDetail\nRFC00004114\nBCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))\nTM00004671\nL6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nProject Manager Risques IT & Cyber Sécurité Niveau 2\nSur Site\n13/04/2026 - 31/12/2026\n151,00\nbtnMasterDetail\nRFC00004045\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004676\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00004038\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004675\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003890\nBCEF IT - Business Analyst Socle Data DHV2 (CS)\nTM00004420\nL6_BCEF IT - 2DAI 2 DATA IA\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003863\nBCEF IT - BA - Crédits Pro ER (MCS)\nTM00004311\nL6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003835\nBCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2\nTM00004167\nL6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003827\nBCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2\nTM00004150\nL6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 3\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003797\nBCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)\nTM00004273\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003728\n[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO\nTM00004424\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/10/2026\n130,00\nbtnMasterDetail\nRFC00003679\nBCEF IT - Assurance vie - Gestion de projet (MCS)\nTM00004330\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003672\nBCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte\nTM00004274\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n03/06/2026 - 31/12/2026\n124,00\nbtnMasterDetail\nRFC00003642\nBCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK\nTM00003799\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nBCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA\nSur Site\n13/04/2026 - 30/09/2026\n118,00\nbtnMasterDetail\nRFC00003372\nBCEF IT - CBO - Analyse de Test - Contrat d Offres (CLA)\nTM00003975\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n30/03/2026 - 31/12/2026\n159,00\nbtnMasterDetail\nRFC00003355\nChargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)\nTM00003847\nL6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n06/04/2026 - 30/09/2026\n122,00\nbtnMasterDetail\nRFC00003294\nBCEF IT - CP Senior Mise en oeuvre exigences DCC2 - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)\nTM00004067\nL6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n01/04/2026 - 30/06/2026\n50,00\nbtnMasterDetail\nRFC00003018\nBCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java\nTM00003880\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n06/04/2026 - 31/12/2026\n155,00\nbtnMasterDetail\nRFC00002985\nBCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)\nTM00001894\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n02/03/2026 - 31/12/2026\n175,00\nbtnMasterDetail\nRFC00001175\nBCEF IT - OSBA4 - Epargne - BA - Reporting Transverses\nTM00001974\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00000929\nBCEF IT Projet Gestion Sous Mandat (CLA)\nTM00001888\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n16/03/2026 - 31/12/2026\n167,00`;
 
 async function seedIfEmpty(){
   const existing = await dbGetAll("aos");
   if(existing.length > 0) return;
   const parsed = parseAOs(SEED);
-  const toSave = parsed.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()}));
+  // Appliquer le filtre EXCLUDED_DOMAINS aussi au seed
+  const filtered = parsed.filter(p => !EXCLUDED_DOMAINS.includes(domainGroup(p.org)));
+  const toSave = filtered.map(p=>({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()}));
   await dbPutMany("aos", toSave);
-  await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:parsed.length, updated:0, closed:0, unchanged:0});
-  console.log("Seed: "+parsed.length+" AO importés");
+  await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:toSave.length, updated:0, closed:0, unchanged:0});
+  console.log("Seed: "+toSave.length+" AO importés ("+EXCLUDED_DOMAINS.join(",")+' exclus)');
 }
 
 async function init(){
@@ -1308,7 +1270,6 @@ async function init(){
     statusEl.style.color=useSupabase?"#4ade80":"#fbbf24";
     await seedIfEmpty();
 
-    // Mobile menu
     const menuBtn=document.getElementById("menu-toggle");
     const sidebar=document.getElementById("sidebar");
     const overlay=document.getElementById("sidebar-overlay");
