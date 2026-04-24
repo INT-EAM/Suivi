@@ -571,10 +571,10 @@ function renderDashboard(el) {
     mgrData[bm].total++;
     if(a.statut==="clos" && hasTraitement(a)) { mgrData[bm].closTraite++; }
     else if(a.statut!=="clos") {
-      if(!a.dateReponse) mgrData[bm].aTraiter++;
-      if(a.dateReponse) mgrData[bm].repondu++;
-      if(a.dateQualif) mgrData[bm].qualif++;
-      if(a.dateDemarrage) mgrData[bm].demarrage++;
+      if(a.dateDemarrage)       mgrData[bm].demarrage++;
+      else if(a.dateQualif)     mgrData[bm].qualif++;
+      else if(a.dateReponse)    mgrData[bm].repondu++;
+      else                      mgrData[bm].aTraiter++;
     }
     if(a.datePrise&&a.dateReponse){
       const d1=new Date(a.datePrise),d2=new Date(a.dateReponse);
