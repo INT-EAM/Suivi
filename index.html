@@ -1438,6 +1438,22 @@ function renderImport(el) {
     <div id="import-result"></div>
     <div id="import-history"></div>
 
+    <div class="card" style="margin-top:16px;border-color:#d1fae5">
+      <div class="card-title" style="color:var(--green)">🔄 Sync JSON PWise (bookmarklet)</div>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
+        Après avoir lancé le bookmarklet sur PWise, importez le fichier <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px">pwise_sync_*.json</code> ici.<br>
+        Les AOs avec suivi actif (BM assigné) ne seront <strong>jamais écrasés</strong>.
+      </p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          📂 Charger pwise_sync_*.json
+          <input type="file" id="json-sync-file" accept=".json" style="display:none">
+        </label>
+        <span id="json-sync-info" style="font-size:12px;color:var(--gray)"></span>
+      </div>
+      <div id="json-sync-result"></div>
+    </div>
+
     <div class="card" style="margin-top:20px;border-color:#e0e7ff">
       <div class="card-title" style="color:var(--blue)">📈 Import Historique PWise</div>
       <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
@@ -1464,7 +1480,53 @@ function renderImport(el) {
     reader.readAsText(file);
   });
 
-  // Import historique
+  // ── Import JSON Sync PWise ──
+  document.getElementById("json-sync-file").addEventListener("change", async e => {
+    const file = e.target.files[0]; if(!file) return;
+    document.getElementById("json-sync-info").textContent = "⏳ Lecture...";
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(!data.aos || !data.aos.length) { alert("Fichier invalide ou vide."); return; }
+
+      const info = document.getElementById("json-sync-info");
+      info.textContent = `${data.aos.length} AOs trouvés (${data.extractDate?.slice(0,10)||"?"}) — import en cours...`;
+
+      const existing = await dbGetAll("aos");
+      const existingMap = {};
+      existing.forEach(a => { existingMap[a.rfc] = a; });
+
+      let added=0, updated=0, skipped=0;
+      const toSave = [];
+
+      data.aos.forEach(p => {
+        const ex = existingMap[p.rfc];
+        if(!ex) {
+          toSave.push({...p, isHistorique: true});
+          added++;
+        } else if(!ex.bm && !ex.datePrise) {
+          // Pas de suivi actif → mettre à jour
+          toSave.push({...ex, ...p, isHistorique: ex.isHistorique !== false, dernierImport: today()});
+          updated++;
+        } else {
+          skipped++;
+        }
+      });
+
+      if(toSave.length) await dbPutMany("aos", toSave);
+
+      document.getElementById("json-sync-result").innerHTML = `
+        <div class="import-ok" style="margin-top:12px">
+          ✅ <strong>Sync terminée</strong> — extrait le ${data.extractDate?.slice(0,10)||"?"}<br>
+          🆕 ${added} nouveaux · ♻️ ${updated} mis à jour · ⏭️ ${skipped} ignorés (suivi actif)<br>
+          <span style="font-size:12px">→ <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir l'Historique</a> · <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a></span>
+        </div>`;
+      info.textContent = "";
+    } catch(err) {
+      alert("Erreur : " + err.message);
+      document.getElementById("json-sync-info").textContent = "";
+    }
+  });
   document.getElementById("hist-file").addEventListener("change", e => {
     const file = e.target.files[0]; if(!file) return;
     const reader = new FileReader();
