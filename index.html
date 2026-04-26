@@ -1418,317 +1418,228 @@ async function renderHistorique(el) {
   });
 }
 // ===================== IMPORT =====================
+
+// ── (S) AO factory — construction d'un AO vierge ──
+const AO_DEFAULTS = {
+  bm:"", consultant:"", tjm:"", notes:"",
+  datePrise:"", dateReponse:"", dateQualif:"",
+  dateDemarrage:"", dateCloture:"", dateDisparition:""
+};
+
+function buildNewAO(p, { isHistorique = false } = {}) {
+  return { ...AO_DEFAULTS, ...p, isHistorique, statut:"ouvert",
+    dateOuverture: today(), dateCreation: today(), dernierImport: today() };
+}
+
+// ── (O) Règles de statut PWise — données extensibles ──
+const PWISE_STATUS_RULES = [
+  { test: sp => /non retenu/i.test(sp),   apply: ()  => ({ statut:"clos", dateCloture: today() }) },
+  { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => !ao.dateDemarrage ? { dateDemarrage: today() } : null },
+  { test: sp => /soumis/i.test(sp),       apply: ao  => !ao.dateReponse   ? { dateReponse:  today() } : null },
+];
+
+// ── (S) Application des règles — isolée du reste ──
+function applyStatusRules(ao, statutPwise) {
+  if (hasTraitement(ao)) return {}; // suivi actif protégé
+  for (const rule of PWISE_STATUS_RULES) {
+    if (rule.test(statutPwise)) {
+      return rule.apply(ao) || {};
+    }
+  }
+  return {};
+}
+
+// ── (S)(D) Moteur de sync unifié — toute la logique métier ──
+// mode: 'pwise' | 'json' | 'historique'
+async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
+  const existing   = await dbGetAll("aos");
+  const existingMap = Object.fromEntries(existing.map(a => [a.rfc, a]));
+  const importedRFCs = new Set(parsed.map(p => p.rfc));
+
+  const c = { addedDash:0, addedHist:0, updated:0, closed:0, autoClos:0, unchanged:0, pending:0 };
+  const toSave = [];
+
+  parsed.forEach(p => {
+    const ex          = existingMap[p.rfc];
+    const inPerimeter = !EXCLUDED_DOMAINS.includes(domainGroup(p.org));
+
+    if (!ex) {
+      // ── Nouveau AO ──
+      const isHist = (mode === 'historique') || !inPerimeter;
+      toSave.push(buildNewAO(p, { isHistorique: isHist }));
+      inPerimeter ? c.addedDash++ : c.addedHist++;
+      return;
+    }
+
+    if (mode === 'pwise') {
+      // Import texte complet : mise à jour champs + préservation suivi
+      const changed = ex.profil !== p.profil || ex.nbJours !== p.nbJours || ex.dateDebut !== p.dateDebut;
+      toSave.push({
+        ...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport: today(),
+        bm: ex.bm||"", datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"",
+        consultant: ex.consultant||"", tjm: ex.tjm||"", dateQualif: ex.dateQualif||"",
+        dateDemarrage: ex.dateDemarrage||"", notes: ex.notes||"",
+        dateOuverture: ex.dateOuverture || ex.dateCreation || today(),
+        dateCreation:  ex.dateCreation  || today()
+      });
+      changed ? c.updated++ : c.unchanged++;
+
+    } else if (mode === 'json') {
+      // Sync JSON bookmarklet : statutPwise + règles auto
+      const patch = applyStatusRules(ex, p.statutPwise);
+      patch.statut === 'clos' ? c.autoClos++ : c.updated++;
+      toSave.push({ ...ex, statutPwise: p.statutPwise, dernierImport: today(), ...patch });
+
+    } else if (mode === 'historique') {
+      // Retag sans suivi actif
+      if (!ex.isHistorique && !ex.bm && !ex.datePrise) {
+        const suivi = suiviFromPwise(p.statutPwise);
+        toSave.push({ ...ex, isHistorique: true,
+          statut:       suivi === "clos" ? "clos" : ex.statut,
+          dateCloture:  suivi === "clos" && !ex.dateCloture  ? (p.dateDebut || today()) : ex.dateCloture,
+          dateReponse:  ["repondu","demarrage"].includes(suivi) && !ex.dateReponse  ? (p.dateDebut || today()) : ex.dateReponse,
+          dateDemarrage: suivi === "demarrage" && !ex.dateDemarrage ? (p.dateDebut || today()) : ex.dateDemarrage,
+        });
+        c.updated++;
+      }
+    }
+  });
+
+  // ── Gestion des absents ──
+  if (mode === 'pwise') {
+    existing.forEach(ex => {
+      if (ex.statut === "clos" || importedRFCs.has(ex.rfc)) return;
+      if (ex.dateReponse) {
+        const days = Math.round((new Date() - new Date(ex.dateDisparition || today())) / 86400000);
+        if (days < 30) { toSave.push({ ...ex, dateDisparition: ex.dateDisparition || today(), dernierImport: today() }); c.pending++; return; }
+      }
+      toSave.push({ ...ex, statut: "clos", dateCloture: today(), dernierImport: today() });
+      c.closed++;
+    });
+    parsed.forEach(p => { const s = toSave.find(x => x.rfc === p.rfc); if (s?.dateDisparition) s.dateDisparition = ""; });
+  } else if (mode === 'json') {
+    existing
+      .filter(ex => !ex.isHistorique && ex.statut !== "clos" && !importedRFCs.has(ex.rfc) && !hasTraitement(ex))
+      .forEach(ex => { if (!ex.dateDisparition) toSave.push({ ...ex, dateDisparition: today() }); });
+  }
+
+  if (toSave.length) await dbPutMany("aos", toSave);
+  if (logImport) await dbPut("imports", { date: today(), time: new Date().toLocaleTimeString("fr-FR"), nbParsed: parsed.length, ...c });
+  return c;
+}
+
+// ── (S) Lecture de fichier — utilitaire pur ──
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+// ── (S) Formatage du résultat — séparé de la logique ──
+function formatSyncResult(c, label, date = "") {
+  const dateStr = date ? ` — ${date}` : "";
+  return `<div class="import-ok" style="margin-top:12px">
+    ✅ <strong>${label}</strong>${dateStr}<br>
+    🆕 ${c.addedDash} nouveaux actifs · 📚 ${c.addedHist} historiques
+    ${c.updated ? `· ♻️ ${c.updated} mis à jour` : ""}
+    ${c.autoClos ? `· 🔒 ${c.autoClos} auto-clos` : ""}
+    ${c.closed   ? `· ⚫ ${c.closed} clos`         : ""}
+    ${c.pending  ? `· ⏳ ${c.pending} en sursis`    : ""}
+    ${c.unchanged ? `· ✔️ ${c.unchanged} inchangés` : ""}
+    <br><span style="font-size:12px">→
+      <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a> ·
+      <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Historique</a>
+    </span>
+  </div>`;
+}
+
+// ── (S) Rendu UI — séparé de la logique métier ──
+// ── (S) Rendu UI — séparé de la logique métier ──
 function renderImport(el) {
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import PWise</h1>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">Copiez le texte brut depuis PWise et collez-le ici. Les nouveaux AO seront ajoutés, les AO absents seront marqués comme clos.</p>
-
+    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">
+      Importez les AOs depuis PWise — texte copié, fichier .txt ou fichier .json (bookmarklet).
+    </p>
     <div class="card">
-      <div class="card-title">📄 Coller le texte ou charger un fichier</div>
-      <textarea id="import-text" style="width:100%;height:200px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le contenu copié depuis PWise..."></textarea>
-      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
+      <div class="card-title">📥 Importer des AOs</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px;border:2px solid var(--green);background:#f0fdf4;font-weight:600;color:var(--green)">
+          <input type="radio" name="import-mode" value="pwise" checked style="accent-color:var(--green)"> 🔄 Encours actifs
+        </label>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px;border:2px solid var(--blue);background:#eff6ff;font-weight:600;color:var(--blue)">
+          <input type="radio" name="import-mode" value="historique" style="accent-color:var(--blue)"> 📈 Historique global
+        </label>
+      </div>
+      <textarea id="import-text" style="width:100%;height:180px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le texte PWise ou le contenu d'un fichier .txt..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-green" id="run-import">🚀 Lancer l'import</button>
-        <span style="color:var(--gray);font-size:12px">ou</span>
-        <label class="btn" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
-          📎 Charger un fichier .txt
+        <span style="color:var(--gray);font-size:12px">ou charger :</span>
+        <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+          📄 Fichier .txt
           <input type="file" id="import-file" accept=".txt,.text" style="display:none">
         </label>
-      </div>
-    </div>
-    <div id="import-result"></div>
-    <div id="import-history"></div>
-
-    <div class="card" style="margin-top:16px;border-color:#d1fae5">
-      <div class="card-title" style="color:var(--green)">🔄 Sync JSON PWise (bookmarklet)</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
-        Après avoir lancé le bookmarklet sur PWise, importez le fichier <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px">pwise_sync_*.json</code> ici.<br>
-        Les AOs avec suivi actif (BM assigné) ne seront <strong>jamais écrasés</strong>.
-      </p>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          📂 Charger pwise_sync_*.json
+          📦 Fichier .json (bookmarklet)
           <input type="file" id="json-sync-file" accept=".json" style="display:none">
         </label>
-        <span id="json-sync-info" style="font-size:12px;color:var(--gray)"></span>
+        <span id="import-file-info" style="font-size:11px;color:var(--gray)"></span>
       </div>
-      <div id="json-sync-result"></div>
+      <div id="import-result"></div>
     </div>
-
-    <div class="card" style="margin-top:20px;border-color:#e0e7ff">
-      <div class="card-title" style="color:var(--blue)">📈 Import Historique PWise</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">
-        Importez l'extraction complète PWise (10 pages) pour alimenter la page Historique.<br>
-        <strong>Ces AOs sont stockés séparément</strong> — ils n'apparaissent pas dans le Dashboard ni dans les Appels d'offres actifs.
-      </p>
-      <textarea id="hist-text" style="width:100%;height:160px;border:1px solid #c7d2fe;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le contenu de pwise_export_full.txt..."></textarea>
-      <div style="display:flex;gap:10px;margin-top:12px;align-items:center">
-        <button class="btn" id="run-hist-import" style="background:var(--blue);color:#fff;border-color:var(--blue)">🚀 Importer en Historique</button>
-        <span style="color:var(--gray);font-size:12px">ou</span>
-        <label class="btn" style="cursor:pointer">📎 Charger pwise_export_full.txt
-          <input type="file" id="hist-file" accept=".txt" style="display:none">
-        </label>
-      </div>
-      <div id="hist-result"></div>
-    </div>
+    <div id="import-history"></div>
   `;
 
-  document.getElementById("import-file").addEventListener("change",e=>{
-    const file=e.target.files[0];
-    if(!file)return;
-    const reader=new FileReader();
-    reader.onload=ev=>{document.getElementById("import-text").value=ev.target.result;};
-    reader.readAsText(file);
+  // Charger .txt → coller dans textarea
+  document.getElementById("import-file").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    document.getElementById("import-text").value = await readFile(file);
+    document.getElementById("import-file-info").textContent = `📄 ${file.name}`;
   });
 
-  // ── Import JSON Sync PWise ──
+  // Charger .json → sync directe
   document.getElementById("json-sync-file").addEventListener("change", async e => {
-    const file = e.target.files[0]; if(!file) return;
-    const info = document.getElementById("json-sync-info");
-    const result = document.getElementById("json-sync-result");
-    info.textContent = "⏳ Lecture...";
+    const file = e.target.files[0]; if (!file) return;
+    const info   = document.getElementById("import-file-info");
+    const result = document.getElementById("import-result");
+    info.textContent = `⏳ Lecture ${file.name}...`;
     result.innerHTML = "";
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if(!data.aos || !data.aos.length) { alert("Fichier invalide ou vide."); return; }
-
-      info.textContent = `${data.aos.length} AOs trouvés (${data.extractDate?.slice(0,10)||"?"}) — sync en cours...`;
-
-      const existing = await dbGetAll("aos");
-      const existingMap = {};
-      existing.forEach(a => { existingMap[a.rfc] = a; });
-      const importedRFCs = new Set(data.aos.map(p => p.rfc));
-
-      let addedDash=0, addedHist=0, updatedStatut=0, autoClos=0, skipped=0;
-      const toSave = [];
-
-      data.aos.forEach(p => {
-        const inDashPerimeter = !EXCLUDED_DOMAINS.includes(domainGroup(p.org));
-        const ex = existingMap[p.rfc];
-
-        if(!ex) {
-          // ── NOUVEAU AO ──
-          if(inDashPerimeter) {
-            // Dans le périmètre → AO actif dans le dashboard
-            toSave.push({
-              ...p,
-              isHistorique: false,
-              statut: "ouvert",
-              bm:"", consultant:"", tjm:"", notes:"",
-              dateOuverture: today(), dateCreation: today(),
-              datePrise:"", dateReponse:"", dateQualif:"",
-              dateDemarrage:"", dateCloture:"", dateDisparition:"",
-              dernierImport: today()
-            });
-            addedDash++;
-          } else {
-            // Hors périmètre (IECC/DIFA/MDEP) → historique uniquement
-            toSave.push({
-              ...p, isHistorique: true, statut: "ouvert",
-              bm:"", consultant:"", tjm:"", notes:"",
-              dateOuverture: today(), dateCreation: today(),
-              datePrise:"", dateReponse:"", dateQualif:"",
-              dateDemarrage:"", dateCloture:"", dateDisparition:"",
-              dernierImport: today()
-            });
-            addedHist++;
-          }
-
-        } else {
-          // ── AO EXISTANT → mettre à jour le statutPwise ──
-          const base = {...ex, statutPwise: p.statutPwise, dernierImport: today()};
-
-          if(!hasTraitement(ex)) {
-            // Pas de suivi actif → appliquer les règles de statut
-            // Règle 1 : RFC non retenu → clôture automatique
-            if(/non retenu/i.test(p.statutPwise) && ex.statut !== "clos") {
-              base.statut = "clos";
-              base.dateCloture = today();
-              autoClos++;
-            }
-            // Règle 2 : RFC retenu → marquer comme démarré si pas encore fait
-            else if(/^RFC retenu$/i.test(p.statutPwise) && !ex.dateDemarrage) {
-              base.dateDemarrage = today();
-              updatedStatut++;
-            }
-            // Règle 3 : RFC soumis → on a répondu
-            else if(/soumis/i.test(p.statutPwise) && !ex.dateReponse) {
-              base.dateReponse = today();
-              updatedStatut++;
-            }
-            else {
-              updatedStatut++;
-            }
-          } else {
-            // Suivi actif → on ne touche qu'au statutPwise, jamais au suivi INTM
-            updatedStatut++;
-          }
-          toSave.push(base);
-        }
-      });
-
-      // ── AOs actifs absents du dernier import → surveiller ──
-      existing
-        .filter(ex => !ex.isHistorique && ex.statut !== "clos" && !importedRFCs.has(ex.rfc) && !hasTraitement(ex))
-        .forEach(ex => {
-          // Absent + pas de suivi = potentiellement disparu → noter la date
-          if(!ex.dateDisparition) {
-            toSave.push({...ex, dateDisparition: today()});
-          }
-        });
-
-      if(toSave.length) await dbPutMany("aos", toSave);
-
-      result.innerHTML = `
-        <div class="import-ok" style="margin-top:12px">
-          ✅ <strong>Sync terminée</strong> — extrait le ${data.extractDate?.slice(0,10)||"?"}<br>
-          🆕 ${addedDash} nouveaux AO actifs (dashboard) · 📚 ${addedHist} historiques (IECC/DIFA/MDEP)<br>
-          🔄 ${updatedStatut} statuts mis à jour · 🔒 ${autoClos} auto-clos (non retenus sans suivi)<br>
-          ⏭️ ${skipped} ignorés
-          <br><span style="font-size:12px">→
-            <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a> ·
-            <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Historique</a>
-          </span>
-        </div>`;
-      info.textContent = "";
-    } catch(err) {
-      alert("Erreur : " + err.message);
-      info.textContent = "";
-    }
-  });
-  document.getElementById("hist-file").addEventListener("change", e => {
-    const file = e.target.files[0]; if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => { document.getElementById("hist-text").value = ev.target.result; };
-    reader.readAsText(file);
+      const data = JSON.parse(await readFile(file));
+      if (!data.aos?.length) { alert("Fichier JSON invalide ou vide."); info.textContent = ""; return; }
+      info.textContent = `${data.aos.length} AOs trouvés — sync en cours...`;
+      const c = await syncAOs(data.aos, { mode: 'json' });
+      result.innerHTML = formatSyncResult(c, "Sync JSON terminée", data.extractDate?.slice(0,10));
+      info.textContent = `✅ ${file.name}`;
+      loadImportHistory();
+    } catch(err) { alert("Erreur : " + err.message); info.textContent = ""; }
   });
 
-  document.getElementById("run-hist-import").addEventListener("click", async () => {
-    const raw = document.getElementById("hist-text").value.trim();
-    if (!raw) { alert("Collez d'abord le texte PWise historique."); return; }
-    const btn = document.getElementById("run-hist-import");
-    btn.textContent = "⏳ Import en cours..."; btn.disabled = true;
-    const { added, updated, skipped } = await importHistorique(raw);
-    btn.textContent = "🚀 Importer en Historique"; btn.disabled = false;
-    document.getElementById("hist-result").innerHTML = `
-      <div class="import-ok" style="margin-top:12px">
-        ✅ Import historique terminé<br>
-        🆕 ${added} nouveaux · ♻️ ${updated} retaggés comme historiques · ⏭️ ${skipped} ignorés (suivi actif)
-        <br><span style="font-size:12px">→ <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir la page Historique</a></span>
-      </div>`;
-  });
-
-  document.getElementById("run-import").addEventListener("click", async()=>{
-    const raw = document.getElementById("import-text").value.trim();
-    if(!raw){alert("Collez d'abord le texte PWise.");return;}
+  // Lancer import texte
+  document.getElementById("run-import").addEventListener("click", async () => {
+    const raw  = document.getElementById("import-text").value.trim();
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    if (!raw) { alert("Collez d'abord du texte ou chargez un fichier .txt."); return; }
     const parsed = parseAOs(raw);
-    if(!parsed.length){document.getElementById("import-result").innerHTML=`<div class="import-warn" style="margin-top:16px">⚠️ Aucun AO détecté. Vérifiez le format du texte.</div>`;return;}
-
-    const existing = await dbGetAll("aos");
-    const existingMap = {};
-    existing.forEach(a=>{existingMap[a.rfc]=a;});
-    const importedRFCs = new Set(parsed.map(a=>a.rfc));
-
-    let added=0, updated=0, closed=0, unchanged=0;
-    const toSave = [];
-
-    parsed.forEach(p=>{
-      const ex = existingMap[p.rfc];
-      if(!ex){
-        toSave.push({...p, statut:"ouvert", bm:"", datePrise:"", dateReponse:"", consultant:"", tjm:"", dateQualif:"", dateDemarrage:"", notes:"", dateOuverture:today(), dateCreation:today(), dateCloture:"", dateDisparition:"", dernierImport:today()});
-        added++;
-      } else {
-        let changed = ex.profil!==p.profil||ex.nbJours!==p.nbJours||ex.dateDebut!==p.dateDebut||ex.dateFin!==p.dateFin;
-        const merged = {...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport:today(),
-          bm:ex.bm||"", datePrise:ex.datePrise||"", dateReponse:ex.dateReponse||"", consultant:ex.consultant||"", tjm:ex.tjm||"",
-          dateQualif:ex.dateQualif||"", dateDemarrage:ex.dateDemarrage||"", notes:ex.notes||"", dateOuverture:ex.dateOuverture||ex.dateCreation||today(), dateCreation:ex.dateCreation||today()};
-        toSave.push(merged);
-        if(changed) updated++; else unchanged++;
-      }
-    });
-
-    let pending=0;
-    existing.forEach(ex=>{
-      if(ex.statut==="clos"||importedRFCs.has(ex.rfc)) return;
-      if(ex.dateReponse) {
-        const dispDate = ex.dateDisparition || today();
-        const daysSinceDisp = Math.round((new Date() - new Date(dispDate)) / 86400000);
-        if(daysSinceDisp < 30) {
-          toSave.push({...ex, dateDisparition: ex.dateDisparition || today(), dernierImport:today()});
-          pending++;
-          return;
-        }
-      }
-      toSave.push({...ex, statut:"clos", dateCloture:today(), dernierImport:today()});
-      closed++;
-    });
-
-    parsed.forEach(p=>{
-      const saved = toSave.find(s=>s.rfc===p.rfc);
-      if(saved && saved.dateDisparition) saved.dateDisparition="";
-    });
-
-    await dbPutMany("aos", toSave);
-    await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added, updated, closed, pending, unchanged});
-
-    document.getElementById("import-result").innerHTML=`
-      <div class="import-ok" style="margin-top:16px">
-        <strong>✅ Import réussi !</strong><br>
-        📊 ${parsed.length} AO dans le fichier<br>
-        🆕 ${added} nouveau${added>1?"x":""} · ♻️ ${updated} mis à jour · 🔒 ${closed} clos · ✔️ ${unchanged} inchangé${unchanged>1?"s":""}${pending?` · ⏳ ${pending} en sursis (répondus, clos dans <30j)`:""}
-      </div>`;
-
+    if (!parsed.length) {
+      document.getElementById("import-result").innerHTML =
+        `<div class="import-warn" style="margin-top:16px">⚠️ Aucun AO détecté. Vérifiez le format du texte.</div>`;
+      return;
+    }
+    const btn = document.getElementById("run-import");
+    btn.textContent = "⏳ Import en cours..."; btn.disabled = true;
+    const c = await syncAOs(parsed, { mode, logImport: mode === 'pwise' });
+    btn.textContent = "🚀 Lancer l'import"; btn.disabled = false;
+    document.getElementById("import-result").innerHTML = formatSyncResult(c,
+      mode === 'historique' ? "Import Historique terminé" : "Import PWise réussi !");
     loadImportHistory();
   });
 
   loadImportHistory();
 }
-
-async function importHistorique(raw) {
-  const parsed = parseAOs(raw);
-  if (!parsed.length) return { added: 0, updated: 0, skipped: 0 };
-  const existing = await dbGetAll("aos");
-  const existingMap = {};
-  existing.forEach(a => { existingMap[a.rfc] = a; });
-
-  const toSave = [];
-  let added = 0, updated = 0, skipped = 0;
-
-  parsed.forEach(p => {
-    const ex = existingMap[p.rfc];
-    const suivi = suiviFromPwise(p.statutPwise);
-
-    if (!ex) {
-      // Nouveau — créer comme historique
-      toSave.push({
-        ...p, isHistorique: true,
-        statut: suivi === "clos" ? "clos" : "ouvert",
-        dateCloture: suivi === "clos" ? (p.dateDebut || today()) : "",
-        dateReponse: ["repondu","demarrage"].includes(suivi) ? (p.dateDebut || today()) : "",
-        dateDemarrage: suivi === "demarrage" ? (p.dateDebut || today()) : "",
-        bm:"", consultant:"", tjm:"", notes:"",
-        dateCreation: today(), dateOuverture: today(), dateDisparition:"", dernierImport: today()
-      });
-      added++;
-    } else if (!ex.isHistorique && !ex.bm && !ex.datePrise) {
-      // Existe mais sans suivi INTM → retagger comme historique
-      toSave.push({...ex, isHistorique: true,
-        statut: suivi === "clos" ? "clos" : ex.statut,
-        dateCloture: suivi === "clos" && !ex.dateCloture ? (p.dateDebut || today()) : ex.dateCloture,
-        dateReponse: ["repondu","demarrage"].includes(suivi) && !ex.dateReponse ? (p.dateDebut || today()) : ex.dateReponse,
-        dateDemarrage: suivi === "demarrage" && !ex.dateDemarrage ? (p.dateDebut || today()) : ex.dateDemarrage,
-      });
-      updated++;
-    } else {
-      // AO avec suivi actif → ne pas toucher
-      skipped++;
-    }
-  });
-
-  if (toSave.length) await dbPutMany("aos", toSave);
-  return { added, updated, skipped };
-}
-
 async function loadImportHistory() {
   const imports = await dbGetAll("imports");
   const el = document.getElementById("import-history");
