@@ -1427,6 +1427,59 @@ async function renderHistorique(el) {
     tagsHtml += '</div>';
   }
 
+  // ── Résultats & pertes (sur les AOs filtrés) ──
+  const hRetenus        = f.filter(a => a.dateReponse && a.dateDemarrage);
+  const hNonRetenus     = f.filter(a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) === 'clos');
+  const hEnAttente      = f.filter(a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) !== 'clos');
+  const hPartisNonSoumis= f.filter(a => !a.dateReponse && suiviFromPwise(a.statutPwise) === 'clos');
+  const hOuvertsNonSoumis = f.filter(a => !a.dateReponse && a.statut !== 'clos' && suiviFromPwise(a.statutPwise) !== 'clos');
+
+  const hTotalSoumis = hRetenus.length + hNonRetenus.length + hEnAttente.length;
+  const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
+
+  const mkHistRow = (emoji, label, items, color, key) => {
+    if (!items.length) return '';
+    const byBM = {};
+    items.forEach(a => { const b = a.bm||'—'; byBM[b] = (byBM[b]||0)+1; });
+    const bmStr = Object.entries(byBM).sort((a,b)=>b[1]-a[1])
+      .map(([b,n]) => `<span style="font-size:10px;background:rgba(0,0,0,0.05);border-radius:4px;padding:1px 5px">${b}:${n}</span>`).join(' ');
+    return `<div class="hist-res-row" data-key="${key}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background 0.1s;margin-bottom:4px;border:1px solid transparent"
+      onmouseover="this.style.background='#f8fafc';this.style.borderColor='${color}'"
+      onmouseout="this.style.background='';this.style.borderColor='transparent'">
+      <div style="font-size:18px;min-width:24px;text-align:center">${emoji}</div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">${label}</div>
+        <div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${bmStr}</div>
+      </div>
+      <div style="font-size:28px;font-weight:800;color:${color};min-width:36px;text-align:right">${items.length}</div>
+    </div>`;
+  };
+
+  const resultatsHistHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">AOs où INTM a répondu</div>
+        ${mkHistRow('🟢', 'Retenus', hRetenus, 'var(--green)', 'retenus')}
+        ${mkHistRow('🔴', 'Non retenus', hNonRetenus, 'var(--red)', 'nonRetenus')}
+        ${mkHistRow('🟡', 'En attente résultat', hEnAttente, 'var(--amber)', 'attente')}
+        ${hTotalSoumis ? `<div style="margin-top:8px;padding:8px;background:var(--gray-light);border-radius:6px;font-size:12px;text-align:center">
+          Taux de succès : <strong style="font-size:16px;color:${hWinRate>=30?'var(--green)':'var(--amber)'}">${hWinRate}%</strong>
+          <span style="color:var(--text-light);font-size:11px">(${hRetenus.length}/${hTotalSoumis})</span>
+        </div>` : ''}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">AOs sans réponse INTM</div>
+        ${mkHistRow('⚠️', "Partis — soumission d'autres", hPartisNonSoumis, 'var(--amber)', 'partis')}
+        ${mkHistRow('⏳', 'Encore ouverts', hOuvertsNonSoumis, 'var(--blue)', 'ouvertsNonSoumis')}
+        ${hPartisNonSoumis.length
+          ? `<div style="margin-top:8px;padding:8px;background:#fef3c7;border-radius:6px;font-size:11px;color:#92400e">
+              ⚠️ <strong>${hPartisNonSoumis.length} AO${hPartisNonSoumis.length>1?'s':''}</strong> partis sans réponse INTM — opportunités manquées
+             </div>`
+          : '<div style="margin-top:8px;padding:8px;background:#d1fae5;border-radius:6px;font-size:11px;color:#065f46">✅ Aucun AO parti sans soumission !</div>'
+        }
+      </div>
+    </div>`;
+
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <h1 style="font-size:24px;font-weight:800">📈 Historique Global</h1>
@@ -1474,7 +1527,79 @@ async function renderHistorique(el) {
       <div class="card-title">🎯 Par type profil <span style="font-size:11px;color:var(--text-light)">— cliquez pour filtrer</span></div>
       ${catHtml}
     </div>
+    <div class="card" style="border-left:4px solid var(--amber)">
+      <div class="card-title">🎯 Résultats & pertes <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez pour voir la liste</span></div>
+      ${resultatsHistHtml}
+    </div>
     <div id="hist-list-panel"></div>`;
+
+  // ── Clics résultats → liste inline ──
+  const histResMap = {
+    retenus:          a => a.dateReponse && a.dateDemarrage,
+    nonRetenus:       a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) === 'clos',
+    attente:          a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) !== 'clos',
+    partis:           a => !a.dateReponse && suiviFromPwise(a.statutPwise) === 'clos',
+    ouvertsNonSoumis: a => !a.dateReponse && a.statut !== 'clos' && suiviFromPwise(a.statutPwise) !== 'clos',
+  };
+  const histResLabels = {
+    retenus:'🟢 Retenus', nonRetenus:'🔴 Non retenus', attente:'🟡 En attente',
+    partis:"⚠️ Partis sans soumission", ouvertsNonSoumis:'⏳ Ouverts non soumis'
+  };
+
+  document.querySelectorAll(".hist-res-row").forEach(row => {
+    row.addEventListener("click", () => {
+      const key    = row.dataset.key;
+      const fn     = histResMap[key]; if (!fn) return;
+      const matched = f.filter(fn);
+      if (!matched.length) return;
+
+      // Retirer panel précédent si même clé
+      const prev = document.getElementById("hist-res-detail");
+      if (prev) { if (prev.dataset.key === key) { prev.remove(); return; } prev.remove(); }
+
+      const panel = document.createElement("div");
+      panel.id = "hist-res-detail";
+      panel.dataset.key = key;
+      panel.className = "card";
+      panel.style.marginTop = "16px";
+
+      const rows = [...matched]
+        .sort((a,b) => (parseDate(b.dateDebut)||0) - (parseDate(a.dateDebut)||0))
+        .map(a => {
+          const cat = categorize(a.profil);
+          return `<tr style="border-bottom:1px solid #f8fafc">
+            <td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#475569">${a.rfc.replace(/RFC0+/,'')}</td>
+            <td style="padding:5px 8px"><span class="badge" style="background:${CAT_COLORS[cat]};font-size:10px">${cat}</span></td>
+            <td style="padding:5px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${a.profil}">${a.profil}</td>
+            <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${shortOrg(a.org)}</td>
+            <td style="padding:5px 8px;font-size:11px;text-align:center">${a.bm||'<span style="color:#d1d5db">—</span>'}</td>
+            <td style="padding:5px 8px;font-size:11px">${a.dateReponse||'<span style="color:#d1d5db">—</span>'}</td>
+            <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${a.statutPwise||'—'}</td>
+          </tr>`;
+        }).join('');
+
+      panel.innerHTML = `
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>${histResLabels[key]} <span style="font-weight:400;font-size:12px;color:var(--gray)">${matched.length} AO</span></span>
+          <button class="btn" onclick="this.closest('#hist-res-detail').remove()" style="font-size:11px;padding:3px 10px">✕</button>
+        </div>
+        <div class="table-wrap"><table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--gray-light)">
+            <th style="padding:6px 8px;font-size:11px;color:var(--gray)">RFC</th>
+            <th style="padding:6px 8px">Cat.</th>
+            <th style="padding:6px 8px;text-align:left">Profil</th>
+            <th style="padding:6px 8px;text-align:left">Domaine</th>
+            <th style="padding:6px 8px;text-align:center">BM</th>
+            <th style="padding:6px 8px">Réponse INTM</th>
+            <th style="padding:6px 8px;text-align:left">Statut PWise</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
+
+      el.appendChild(panel);
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 
   // ── Fonction affichage liste ──
   function showHistList() {
