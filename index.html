@@ -177,6 +177,9 @@ td.r { text-align: right; }
     <div class="nav-item" data-view="historique"><span class="icon">📈</span> Historique</div>
     <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
     <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
+    <div style="position:absolute;bottom:52px;left:0;right:0;padding:0 16px">
+      <div id="user-badge" style="padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.05);text-align:center"></div>
+    </div>
     <div style="position:absolute;bottom:16px;left:0;right:0;padding:0 20px">
       <div id="db-status" style="font-size:10px;padding:6px 10px;border-radius:6px;text-align:center"></div>
     </div>
@@ -384,6 +387,39 @@ function periodFilter(dateStr, period) {
 let allAOs = [];
 let histAOs = [];
 let currentView = "dashboard";
+
+// ── Gestion utilisateur courant (Phase 1 traçabilité) ──
+const USER_KEY = 'intm_trigramme';
+let currentUser = localStorage.getItem(USER_KEY) || "";
+
+function setCurrentUser(tri) {
+  currentUser = tri.toUpperCase().trim().substring(0, 4);
+  localStorage.setItem(USER_KEY, currentUser);
+  renderUserBadge();
+}
+
+function renderUserBadge() {
+  const badge = document.getElementById("user-badge");
+  if (!badge) return;
+  if (currentUser) {
+    badge.innerHTML = `<span style="font-size:11px;color:#94a3b8">Connecté en tant que</span> <strong style="color:#fff;letter-spacing:1px">${currentUser}</strong> <button onclick="promptUser()" style="margin-left:6px;background:none;border:1px solid rgba(255,255,255,0.2);color:#94a3b8;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">✏️</button>`;
+  } else {
+    badge.innerHTML = `<button onclick="promptUser()" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">⚠️ Définir mon trigramme</button>`;
+  }
+}
+
+function promptUser() {
+  const tri = prompt("Votre trigramme (ex: VBE, FIB) :", currentUser);
+  if (tri !== null) setCurrentUser(tri);
+}
+
+// Stamp : ajoute traçabilité à un AO avant sauvegarde
+function stampAO(ao, action = "modifié") {
+  if (!currentUser) return ao;
+  const entry = { by: currentUser, at: new Date().toISOString(), action };
+  const history = [...(ao.history || []).slice(-9), entry]; // garder 10 entrées max
+  return { ...ao, modifiedBy: currentUser, modifiedAt: entry.at, history };
+}
 let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
 let sort = { col:"dateDebut", dir:1 };
 let selectedRFC = null;
@@ -919,6 +955,9 @@ function renderListe(el) {
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
       <td>${statutPill(sc,a)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
+      <td style="font-size:10px;color:var(--text-light);text-align:center" title="${a.modifiedAt?'Modifié le '+new Date(a.modifiedAt).toLocaleDateString('fr-FR'):''}">
+        ${a.modifiedBy?`<span style="font-weight:600;color:var(--green)">${a.modifiedBy}</span>`:'—'}
+      </td>
     </tr>`;
   }).join("");
 
@@ -954,7 +993,7 @@ function renderListe(el) {
           <th>Cat.</th><th>Profil</th><th>Domaine</th>
           <th class="sortable" data-col="dateDebut">Début</th>
           <th class="sortable r" data-col="nbJours">Jours</th>
-          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th>
+          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th><th style="text-align:center">Modif.</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -1027,6 +1066,18 @@ function renderDetail(el, rfc) {
           <button class="btn btn-red" id="clear-detail">🗑️ Effacer le suivi</button>
           <button class="btn" id="delete-ao" style="margin-left:auto;color:#7f1d1d;border-color:#fecaca;background:#fff5f5" title="Supprime définitivement cet AO de la base">🗑️ Supprimer l'AO</button>
         </div>
+        ${(ao.history?.length || ao.modifiedBy) ? `
+        <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:600;color:var(--text-light);margin-bottom:6px">📋 Historique des modifications</div>
+          <div style="display:flex;flex-direction:column;gap:3px">
+            ${[...(ao.history||[])].reverse().map(h => `
+              <div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0;border-bottom:1px solid #f8fafc">
+                <span style="font-weight:700;color:var(--green);text-transform:uppercase;min-width:28px">${h.by}</span>
+                <span style="color:var(--gray)">${h.action}</span>
+                <span style="color:var(--text-light);margin-left:auto">${new Date(h.at).toLocaleDateString('fr-FR')} ${new Date(h.at).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}</span>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
       </div>
     </div>
   `;
@@ -1052,13 +1103,13 @@ function renderDetail(el, rfc) {
     ao.dateCloture = document.getElementById("d_dateCloture").value;
     ao.statut = ao.dateCloture ? "clos" : "ouvert";
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
-    await dbPut("aos", ao);
+    await dbPut("aos", stampAO(ao, "suivi mis à jour"));
     renderView();
   });
   document.getElementById("clear-detail").addEventListener("click",async()=>{
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
     ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
-    await dbPut("aos", ao);
+    await dbPut("aos", stampAO(ao, "suivi effacé"));
     renderView();
   });
   document.getElementById("delete-ao").addEventListener("click",async()=>{
@@ -1803,6 +1854,15 @@ async function init(){
     else statusEl.innerHTML='🟡 Mode local';
     statusEl.style.background=useSupabase?"rgba(0,145,90,0.15)":"rgba(245,158,11,0.15)";
     statusEl.style.color=useSupabase?"#4ade80":"#fbbf24";
+
+    // Init badge utilisateur
+    renderUserBadge();
+    if(!currentUser) {
+      setTimeout(() => {
+        const tri = prompt("👋 Bienvenue ! Entrez votre trigramme pour activer la traçabilité (ex: VBE, FIB) :");
+        if(tri) setCurrentUser(tri);
+      }, 800);
+    }
     await seedIfEmpty();
 
     const menuBtn=document.getElementById("menu-toggle");
