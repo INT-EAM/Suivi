@@ -1071,7 +1071,7 @@ function renderDetail(el, rfc) {
 }
 
 // ===================== HISTORIQUE =====================
-let histF = { dept: "Tous", cat: "Tous", statut: "Tous" };
+let histF = { dept: "Tous", cat: "Tous", statut: "Tous", domain: "Tous", statutPwise: "Tous" };
 
 function suiviFromPwise(sp) {
   if (!sp) return "encours";
@@ -1101,7 +1101,9 @@ async function renderHistorique(el) {
   // Filtrage
   let f = [...histAOs];
   if (histF.dept !== "Tous") f = f.filter(a => a.dept === histF.dept);
+  if (histF.domain !== "Tous") f = f.filter(a => domainGroup(a.org) === histF.domain);
   if (histF.cat  !== "Tous") f = f.filter(a => categorize(a.profil) === histF.cat);
+  if (histF.statutPwise !== "Tous") f = f.filter(a => (a.statutPwise||"—") === histF.statutPwise);
   if (histF.statut !== "Tous") {
     if (histF.statut === "demarrage") f = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage");
     else if (histF.statut === "clos") f = f.filter(a => suiviFromPwise(a.statutPwise) === "clos");
@@ -1204,9 +1206,10 @@ async function renderHistorique(el) {
   let domHtml = '';
   domainEntries.forEach(([d, s]) => {
     const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
-    domHtml += `<div class="bar-row">
+    const sel = histF.domain === d;
+    domHtml += `<div class="bar-row hist-click" data-key="domain" data-val="${d}" style="cursor:pointer;${sel?"outline:2px solid var(--purple);border-radius:6px;":""}">
       <div class="bar-label" title="${d}">${d}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDom*100)}%;background:var(--purple)">
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(s.total/maxDom*100)}%;background:${sel?"var(--green)":"var(--purple)"}">
         <span style="font-size:10px">${s.total}</span>
       </div></div>
       <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
@@ -1219,7 +1222,8 @@ async function renderHistorique(el) {
     const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
     const joursCat = f.filter(a => categorize(a.profil)===c && a.nbJours>0).map(a=>a.nbJours);
     const avgJ = joursCat.length ? Math.round(joursCat.reduce((a,b)=>a+b,0)/joursCat.length) : 0;
-    catHtml += `<tr style="border-bottom:1px solid #f8fafc">
+    const sel = histF.cat === c;
+    catHtml += `<tr class="hist-click" data-key="cat" data-val="${c}" style="border-bottom:1px solid #f8fafc;cursor:pointer;${sel?"background:#f0fdf4;outline:2px solid var(--green);":""}transition:background 0.1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='${sel?"#f0fdf4":""}'"  >
       <td style="padding:5px 8px"><span class="badge" style="background:${CAT_COLORS[c]}">${c}</span></td>
       <td style="text-align:center;font-weight:700">${s.total}</td>
       <td style="text-align:center;color:var(--green);font-weight:600">${s.retenu}</td>
@@ -1235,7 +1239,8 @@ async function renderHistorique(el) {
     const suivi = suiviFromPwise(s);
     const color = {demarrage:"var(--green)",repondu:"var(--amber)",clos:"var(--gray)",encours:"var(--blue)"}[suivi]||"var(--gray)";
     const pct = Math.round(n/total*100);
-    statutHtml += `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc">
+    const sel = histF.statutPwise === s;
+    statutHtml += `<div class="hist-click" data-key="statutPwise" data-val="${s}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #f8fafc;cursor:pointer;border-radius:6px;${sel?"background:#f0fdf4;outline:2px solid var(--green);":""}">
       <div style="width:10px;height:10px;border-radius:50%;background:${color};flex-shrink:0"></div>
       <div style="flex:1;font-size:12px">${s}</div>
       <div style="font-weight:700;font-size:13px;min-width:24px;text-align:right">${n}</div>
@@ -1243,14 +1248,30 @@ async function renderHistorique(el) {
     </div>`;
   });
 
-  const selTag = histF.dept !== "Tous" ? `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer" class="hist-dept-click" data-dept="">✕ ${histF.dept}</span>` : "";
+  // Tags filtres actifs
+  const tags = [];
+  if (histF.dept !== "Tous") tags.push({k:"dept", v:histF.dept});
+  if (histF.domain !== "Tous") tags.push({k:"domain", v:histF.domain});
+  if (histF.cat !== "Tous") tags.push({k:"cat", v:histF.cat});
+  if (histF.statut !== "Tous") tags.push({k:"statut", v:{demarrage:"Retenus",clos:"Non retenus",repondu:"Soumis",encours:"En cours"}[histF.statut]||histF.statut});
+  if (histF.statutPwise !== "Tous") tags.push({k:"statutPwise", v:histF.statutPwise});
+
+  let tagsHtml = '';
+  if (tags.length) {
+    tagsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
+    tags.forEach(t => {
+      tagsHtml += `<span class="hist-tag" data-key="${t.k}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:#e0f2fe;border-radius:16px;font-size:11px;font-weight:600;color:#0369a1;cursor:pointer">${t.v} ✕</span>`;
+    });
+    tagsHtml += `<span class="hist-clear" style="display:inline-flex;align-items:center;padding:3px 10px;background:#fef3c7;border-radius:16px;font-size:11px;font-weight:600;color:#92400e;cursor:pointer">✕ Tout réinitialiser</span>`;
+    tagsHtml += '</div>';
+  }
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <h1 style="font-size:24px;font-weight:800">📈 Historique Global</h1>
       <span style="font-size:13px;color:var(--gray)">${histAOs.length} AO · tous périmètres</span>
     </div>
-    <div class="filter-bar" style="margin-bottom:16px">
+    <div class="filter-bar" style="margin-bottom:8px">
       <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Tous départements":d}</option>`).join("")}</select>
       <select id="hf_cat">${cats.map(c=>`<option value="${c}"${histF.cat===c?" selected":""}>${c==="Tous"?"Tous profils":c}</option>`).join("")}</select>
       <select id="hf_statut">
@@ -1260,50 +1281,70 @@ async function renderHistorique(el) {
         <option value="clos"${histF.statut==="clos"?" selected":""}>⚫ Non retenus</option>
         <option value="encours"${histF.statut==="encours"?" selected":""}>🔵 En cours</option>
       </select>
-      ${selTag}
     </div>
+    ${tagsHtml}
 
     <div class="kpi-grid" style="margin-bottom:20px">
-      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">Total AO</div><div class="kpi-sub">tous périmètres</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${encours}</div><div class="kpi-label">En cours</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--amber)">${reponduSeulement}</div><div class="kpi-label">Soumis</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus ✓</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${nonRetenus}</div><div class="kpi-label">Non retenus</div></div>
+      <div class="kpi hist-click" data-key="statut" data-val="Tous" style="cursor:pointer;${histF.statut==="Tous"&&!tags.length?"outline:2px solid var(--blue);":""}"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">Total AO</div><div class="kpi-sub">tous périmètres</div></div>
+      <div class="kpi hist-click" data-key="statut" data-val="encours" style="cursor:pointer;${histF.statut==="encours"?"outline:2px solid var(--blue);":""}"><div class="kpi-value" style="color:var(--blue)">${encours}</div><div class="kpi-label">En cours</div></div>
+      <div class="kpi hist-click" data-key="statut" data-val="repondu" style="cursor:pointer;${histF.statut==="repondu"?"outline:2px solid var(--amber);":""}"><div class="kpi-value" style="color:var(--amber)">${reponduSeulement}</div><div class="kpi-label">Soumis</div></div>
+      <div class="kpi hist-click" data-key="statut" data-val="demarrage" style="cursor:pointer;${histF.statut==="demarrage"?"outline:2px solid var(--green);":""}"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus ✓</div></div>
+      <div class="kpi hist-click" data-key="statut" data-val="clos" style="cursor:pointer;${histF.statut==="clos"?"outline:2px solid var(--gray);":""}"><div class="kpi-value" style="color:var(--gray)">${nonRetenus}</div><div class="kpi-label">Non retenus</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</div><div class="kpi-label">Taux reçu→retenu</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${avgJours||"—"}</div><div class="kpi-label">Jours moy.</div><div class="kpi-sub">par mission</div></div>
     </div>
 
     <div class="dash-grid">
-      <div class="card">
-        <div class="card-title">🔄 Funnel global</div>
-        ${funnelHtml}
-      </div>
-      <div class="card">
-        <div class="card-title">🏷️ Statuts PWise</div>
-        ${statutHtml}
-      </div>
+      <div class="card"><div class="card-title">🔄 Funnel global</div>${funnelHtml}</div>
+      <div class="card"><div class="card-title">🏷️ Statuts PWise <span style="font-size:11px;color:var(--text-light)">— cliquez pour filtrer</span></div>${statutHtml}</div>
     </div>
     <div class="dash-grid">
       <div class="card">
-        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer — % taux retenu — barre verte = retenus</span></div>
+        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer · % taux retenu</span></div>
         <div class="bar-chart">${deptHtml}</div>
       </div>
       <div class="card">
-        <div class="card-title">🔷 Par domaine (top 15) <span style="font-size:11px;color:var(--text-light)">% taux retenu</span></div>
+        <div class="card-title">🔷 Par domaine (top 15) <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer · % taux retenu</span></div>
         <div class="bar-chart">${domHtml}</div>
       </div>
     </div>
     <div class="card">
-      <div class="card-title">🎯 Par type profil</div>
+      <div class="card-title">🎯 Par type profil <span style="font-size:11px;color:var(--text-light)">— cliquez pour filtrer</span></div>
       ${catHtml}
     </div>`;
 
+  // ── Event listeners ──
   document.getElementById("hf_dept").addEventListener("change", e => { histF.dept = e.target.value; renderHistorique(el); });
   document.getElementById("hf_cat").addEventListener("change",  e => { histF.cat  = e.target.value; renderHistorique(el); });
   document.getElementById("hf_statut").addEventListener("change", e => { histF.statut = e.target.value; renderHistorique(el); });
-  document.querySelectorAll(".hist-dept-click").forEach(btn => {
-    btn.addEventListener("click", () => { histF.dept = btn.dataset.dept || "Tous"; renderHistorique(el); });
+
+  // Clics sur barres / lignes
+  document.querySelectorAll(".hist-click").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.key, v = btn.dataset.val;
+      if (histF[k] === v) histF[k] = k === "statut" ? "Tous" : "Tous"; // toggle off
+      else histF[k] = v;
+      if (k === "dept") histF.domain = "Tous"; // reset domaine si dept change
+      renderHistorique(el);
+    });
+  });
+
+  // Tags — retirer un filtre
+  document.querySelectorAll(".hist-tag").forEach(tag => {
+    tag.addEventListener("click", () => {
+      const k = tag.dataset.key;
+      histF[k] = "Tous";
+      renderHistorique(el);
+    });
+  });
+
+  // Tout réinitialiser
+  document.querySelectorAll(".hist-clear").forEach(btn => {
+    btn.addEventListener("click", () => {
+      histF = { dept:"Tous", domain:"Tous", cat:"Tous", statut:"Tous", statutPwise:"Tous" };
+      renderHistorique(el);
+    });
   });
 }
 // ===================== IMPORT =====================
