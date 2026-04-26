@@ -397,8 +397,8 @@ async function loadAOs() {
 }
 
 async function loadHistoricalAOs() {
-  const all = await dbGetAll("aos");
-  histAOs = all.filter(a => a.isHistorique); // tous périmètres inclus
+  // Historique global = tous les AOs (actifs + historiques, tous périmètres)
+  histAOs = await dbGetAll("aos");
 }
 
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
