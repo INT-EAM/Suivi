@@ -1483,48 +1483,117 @@ function renderImport(el) {
   // ── Import JSON Sync PWise ──
   document.getElementById("json-sync-file").addEventListener("change", async e => {
     const file = e.target.files[0]; if(!file) return;
-    document.getElementById("json-sync-info").textContent = "⏳ Lecture...";
+    const info = document.getElementById("json-sync-info");
+    const result = document.getElementById("json-sync-result");
+    info.textContent = "⏳ Lecture...";
+    result.innerHTML = "";
     try {
       const text = await file.text();
       const data = JSON.parse(text);
       if(!data.aos || !data.aos.length) { alert("Fichier invalide ou vide."); return; }
 
-      const info = document.getElementById("json-sync-info");
-      info.textContent = `${data.aos.length} AOs trouvés (${data.extractDate?.slice(0,10)||"?"}) — import en cours...`;
+      info.textContent = `${data.aos.length} AOs trouvés (${data.extractDate?.slice(0,10)||"?"}) — sync en cours...`;
 
       const existing = await dbGetAll("aos");
       const existingMap = {};
       existing.forEach(a => { existingMap[a.rfc] = a; });
+      const importedRFCs = new Set(data.aos.map(p => p.rfc));
 
-      let added=0, updated=0, skipped=0;
+      let addedDash=0, addedHist=0, updatedStatut=0, autoClos=0, skipped=0;
       const toSave = [];
 
       data.aos.forEach(p => {
+        const inDashPerimeter = !EXCLUDED_DOMAINS.includes(domainGroup(p.org));
         const ex = existingMap[p.rfc];
+
         if(!ex) {
-          toSave.push({...p, isHistorique: true});
-          added++;
-        } else if(!ex.bm && !ex.datePrise) {
-          // Pas de suivi actif → mettre à jour
-          toSave.push({...ex, ...p, isHistorique: ex.isHistorique !== false, dernierImport: today()});
-          updated++;
+          // ── NOUVEAU AO ──
+          if(inDashPerimeter) {
+            // Dans le périmètre → AO actif dans le dashboard
+            toSave.push({
+              ...p,
+              isHistorique: false,
+              statut: "ouvert",
+              bm:"", consultant:"", tjm:"", notes:"",
+              dateOuverture: today(), dateCreation: today(),
+              datePrise:"", dateReponse:"", dateQualif:"",
+              dateDemarrage:"", dateCloture:"", dateDisparition:"",
+              dernierImport: today()
+            });
+            addedDash++;
+          } else {
+            // Hors périmètre (IECC/DIFA/MDEP) → historique uniquement
+            toSave.push({
+              ...p, isHistorique: true, statut: "ouvert",
+              bm:"", consultant:"", tjm:"", notes:"",
+              dateOuverture: today(), dateCreation: today(),
+              datePrise:"", dateReponse:"", dateQualif:"",
+              dateDemarrage:"", dateCloture:"", dateDisparition:"",
+              dernierImport: today()
+            });
+            addedHist++;
+          }
+
         } else {
-          skipped++;
+          // ── AO EXISTANT → mettre à jour le statutPwise ──
+          const base = {...ex, statutPwise: p.statutPwise, dernierImport: today()};
+
+          if(!hasTraitement(ex)) {
+            // Pas de suivi actif → appliquer les règles de statut
+            // Règle 1 : RFC non retenu → clôture automatique
+            if(/non retenu/i.test(p.statutPwise) && ex.statut !== "clos") {
+              base.statut = "clos";
+              base.dateCloture = today();
+              autoClos++;
+            }
+            // Règle 2 : RFC retenu → marquer comme démarré si pas encore fait
+            else if(/^RFC retenu$/i.test(p.statutPwise) && !ex.dateDemarrage) {
+              base.dateDemarrage = today();
+              updatedStatut++;
+            }
+            // Règle 3 : RFC soumis → on a répondu
+            else if(/soumis/i.test(p.statutPwise) && !ex.dateReponse) {
+              base.dateReponse = today();
+              updatedStatut++;
+            }
+            else {
+              updatedStatut++;
+            }
+          } else {
+            // Suivi actif → on ne touche qu'au statutPwise, jamais au suivi INTM
+            updatedStatut++;
+          }
+          toSave.push(base);
         }
       });
 
+      // ── AOs actifs absents du dernier import → surveiller ──
+      existing
+        .filter(ex => !ex.isHistorique && ex.statut !== "clos" && !importedRFCs.has(ex.rfc) && !hasTraitement(ex))
+        .forEach(ex => {
+          // Absent + pas de suivi = potentiellement disparu → noter la date
+          if(!ex.dateDisparition) {
+            toSave.push({...ex, dateDisparition: today()});
+          }
+        });
+
       if(toSave.length) await dbPutMany("aos", toSave);
 
-      document.getElementById("json-sync-result").innerHTML = `
+      result.innerHTML = `
         <div class="import-ok" style="margin-top:12px">
           ✅ <strong>Sync terminée</strong> — extrait le ${data.extractDate?.slice(0,10)||"?"}<br>
-          🆕 ${added} nouveaux · ♻️ ${updated} mis à jour · ⏭️ ${skipped} ignorés (suivi actif)<br>
-          <span style="font-size:12px">→ <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir l'Historique</a> · <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a></span>
+          🆕 ${addedDash} nouveaux AO actifs (dashboard) · 📚 ${addedHist} historiques (IECC/DIFA/MDEP)<br>
+          🔄 ${updatedStatut} statuts mis à jour · 🔒 ${autoClos} auto-clos (non retenus sans suivi)<br>
+          ⏭️ ${skipped} ignorés
+          <br><span style="font-size:12px">→
+            <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a> ·
+            <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Historique</a>
+          </span>
         </div>`;
       info.textContent = "";
     } catch(err) {
       alert("Erreur : " + err.message);
-      document.getElementById("json-sync-info").textContent = "";
+      info.textContent = "";
     }
   });
   document.getElementById("hist-file").addEventListener("change", e => {
