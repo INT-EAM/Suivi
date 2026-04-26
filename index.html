@@ -1312,29 +1312,99 @@ async function renderHistorique(el) {
     <div class="card">
       <div class="card-title">🎯 Par type profil <span style="font-size:11px;color:var(--text-light)">— cliquez pour filtrer</span></div>
       ${catHtml}
+    </div>
+    <div id="hist-list-panel"></div>`;
+
+  // ── Fonction affichage liste ──
+  function showHistList() {
+    const panel = document.getElementById("hist-list-panel");
+    if (!panel) return;
+    if (!f.length) { panel.innerHTML = ''; return; }
+
+    const sorted = [...f].sort((a,b) => {
+      const da = parseDate(a.dateDebut), db = parseDate(b.dateDebut);
+      return (db||0) - (da||0);
+    });
+
+    const statutColor = s => {
+      const sv = suiviFromPwise(s);
+      return {demarrage:"#d1fae5",repondu:"#fef3c7",clos:"#f1f5f9",encours:"#dbeafe"}[sv]||"#f8fafc";
+    };
+    const statutLabel2 = s => {
+      if(/non retenu/i.test(s)) return '<span style="color:#94a3b8;font-size:10px;font-weight:600">⚫ Non retenu</span>';
+      if(/retenu/i.test(s)) return '<span style="color:#00915a;font-size:10px;font-weight:600">🟢 Retenu</span>';
+      if(/soumis/i.test(s)) return '<span style="color:#f59e0b;font-size:10px;font-weight:600">🟡 Soumis</span>';
+      return '<span style="color:#3b82f6;font-size:10px;font-weight:600">🔵 En cours</span>';
+    };
+
+    let rows = sorted.map(a => {
+      const cat = categorize(a.profil);
+      return `<tr style="border-bottom:1px solid #f8fafc;background:${statutColor(a.statutPwise)}">
+        <td style="padding:6px 8px;font-family:monospace;font-size:11px;color:#475569">${a.rfc.replace("RFC00000","").replace("RFC0000","").replace("RFC000","")}</td>
+        <td style="padding:6px 8px"><span class="badge" style="background:${CAT_COLORS[cat]};font-size:10px">${cat}</span></td>
+        <td style="padding:6px 8px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${a.profil}">${a.profil}</td>
+        <td style="padding:6px 8px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--gray)" title="${a.org}">${shortOrg(a.org)}</td>
+        <td style="padding:6px 8px;font-size:11px">${a.dept||"—"}</td>
+        <td style="padding:6px 8px;font-size:11px;white-space:nowrap">${a.dateDebut||"—"}</td>
+        <td style="padding:6px 8px;text-align:right;font-size:11px">${a.nbJours||"—"}</td>
+        <td style="padding:6px 8px">${statutLabel2(a.statutPwise||"")}</td>
+      </tr>`;
+    }).join("");
+
+    panel.innerHTML = `<div class="card" style="margin-top:16px">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 Liste des ${f.length} AO filtrés</span>
+        <button class="btn" id="hist-list-close" style="font-size:11px;padding:3px 10px">✕ Fermer</button>
+      </div>
+      <div class="table-wrap">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--gray-light)">
+            <th style="padding:7px 8px;text-align:left;font-size:11px;color:var(--gray)">RFC</th>
+            <th style="padding:7px 8px">Cat.</th>
+            <th style="padding:7px 8px;text-align:left">Profil</th>
+            <th style="padding:7px 8px;text-align:left">Domaine</th>
+            <th style="padding:7px 8px;text-align:left">Dépt.</th>
+            <th style="padding:7px 8px;text-align:left">Début</th>
+            <th style="padding:7px 8px;text-align:right">Jours</th>
+            <th style="padding:7px 8px;text-align:left">Statut</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
     </div>`;
+
+    document.getElementById("hist-list-close").addEventListener("click", () => { panel.innerHTML = ''; });
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Afficher la liste par défaut si filtres actifs
+  if (tags.length) showHistList();
 
   // ── Event listeners ──
   document.getElementById("hf_dept").addEventListener("change", e => { histF.dept = e.target.value; renderHistorique(el); });
   document.getElementById("hf_cat").addEventListener("change",  e => { histF.cat  = e.target.value; renderHistorique(el); });
   document.getElementById("hf_statut").addEventListener("change", e => { histF.statut = e.target.value; renderHistorique(el); });
 
-  // Clics sur barres / lignes
+  // Clics sur barres / lignes → filtre + liste
   document.querySelectorAll(".hist-click").forEach(btn => {
     btn.addEventListener("click", () => {
       const k = btn.dataset.key, v = btn.dataset.val;
-      if (histF[k] === v) histF[k] = k === "statut" ? "Tous" : "Tous"; // toggle off
+      if (histF[k] === v) histF[k] = "Tous"; // toggle off
       else histF[k] = v;
-      if (k === "dept") histF.domain = "Tous"; // reset domaine si dept change
+      if (k === "dept") histF.domain = "Tous";
       renderHistorique(el);
+      // Scroll + afficher liste après rendu
+      setTimeout(() => {
+        const panel = document.getElementById("hist-list-panel");
+        if (panel) { showHistList(); }
+      }, 50);
     });
   });
 
   // Tags — retirer un filtre
   document.querySelectorAll(".hist-tag").forEach(tag => {
     tag.addEventListener("click", () => {
-      const k = tag.dataset.key;
-      histF[k] = "Tous";
+      histF[tag.dataset.key] = "Tous";
       renderHistorique(el);
     });
   });
