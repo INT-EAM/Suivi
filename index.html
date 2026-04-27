@@ -1354,21 +1354,57 @@ async function renderHistorique(el) {
   f.forEach(a => { const s = a.statutPwise||"—"; byStatut[s] = (byStatut[s]||0) + 1; });
 
   let deptHtml = '';
-  deptEntries.forEach(([d, s]) => {
-    const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
-    const selD = histF.dept === d;
-    const barW = Math.round(s.total/maxDept*100);
-    deptHtml += `<div class="bar-row hist-dept-click" data-dept="${d}" style="cursor:pointer;${selD?"outline:2px solid var(--green);border-radius:6px;":""}">
-      <div class="bar-label" title="${d}" style="width:180px">${d}</div>
-      <div class="bar-track" style="position:relative">
-        <div class="bar-fill" style="width:${barW}%;background:${selD?"var(--green)":"var(--blue)"}">
-          <span style="font-size:10px">${s.total}</span>
-        </div>
-        ${s.retenu>0?`<div style="position:absolute;left:${barW}%;top:0;height:100%;width:${Math.round(s.retenu/maxDept*100)}%;background:rgba(0,145,90,0.3);border-radius:0 6px 6px 0"></div>`:""}
-      </div>
-      <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
+  // Si un dept est sélectionné → drill-down domaines de ce dept
+  if (histF.dept !== "Tous") {
+    const deptDomains = {};
+    f.filter(a => a.dept === histF.dept).forEach(a => {
+      const d = domainGroup(a.org) || "—";
+      if (!deptDomains[d]) deptDomains[d] = { total: 0, retenu: 0, clos: 0, repondu: 0, encours: 0 };
+      deptDomains[d].total++;
+      const sv = suiviFromPwise(a.statutPwise);
+      if (sv === "demarrage") deptDomains[d].retenu++;
+      else if (sv === "clos") deptDomains[d].clos++;
+      else if (sv === "repondu") deptDomains[d].repondu++;
+      else deptDomains[d].encours++;
+    });
+    const domEntries = Object.entries(deptDomains).sort((a,b) => b[1].total - a[1].total);
+    const maxDom2 = domEntries.length ? domEntries[0][1].total : 1;
+    deptHtml += `<div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">
+      ${histF.dept} — domaines
+      <span class="hist-clear" style="font-weight:400;color:var(--text-light);cursor:pointer;margin-left:8px">← Tous les depts</span>
     </div>`;
-  });
+    domEntries.forEach(([d, s]) => {
+      const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+      const sel = histF.domain === d;
+      const barW = Math.round(s.total/maxDom2*100);
+      deptHtml += `<div class="bar-row hist-click" data-key="domain" data-val="${d}" style="cursor:pointer;${sel?"outline:2px solid var(--purple);border-radius:6px;":""}">
+        <div class="bar-label" title="${d}" style="width:180px">${d}</div>
+        <div class="bar-track" style="position:relative">
+          <div class="bar-fill" style="width:${barW}%;background:${sel?"var(--green)":"var(--purple)"}">
+            <span style="font-size:10px">${s.total}</span>
+          </div>
+          ${s.retenu>0?`<div style="position:absolute;left:${barW}%;top:0;height:100%;width:${Math.round(s.retenu/maxDom2*100)}%;background:rgba(0,145,90,0.3);border-radius:0 6px 6px 0"></div>`:""}
+        </div>
+        <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
+      </div>`;
+    });
+  } else {
+    deptEntries.forEach(([d, s]) => {
+      const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
+      const selD = histF.dept === d;
+      const barW = Math.round(s.total/maxDept*100);
+      deptHtml += `<div class="bar-row hist-click" data-key="dept" data-val="${d}" style="cursor:pointer;${selD?"outline:2px solid var(--green);border-radius:6px;":""}">
+        <div class="bar-label" title="${d}" style="width:180px">${d}</div>
+        <div class="bar-track" style="position:relative">
+          <div class="bar-fill" style="width:${barW}%;background:${selD?"var(--green)":"var(--blue)"}">
+            <span style="font-size:10px">${s.total}</span>
+          </div>
+          ${s.retenu>0?`<div style="position:absolute;left:${barW}%;top:0;height:100%;width:${Math.round(s.retenu/maxDept*100)}%;background:rgba(0,145,90,0.3);border-radius:0 6px 6px 0"></div>`:""}
+        </div>
+        <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
+      </div>`;
+    });
+  }
 
   let domHtml = '';
   domainEntries.forEach(([d, s]) => {
@@ -1537,7 +1573,7 @@ async function renderHistorique(el) {
     </div>
     <div class="dash-grid">
       <div class="card">
-        <div class="card-title">📂 Par département <span style="font-size:11px;color:var(--text-light)">— clic pour filtrer · % taux retenu</span></div>
+        <div class="card-title">📂 ${histF.dept !== "Tous" ? histF.dept+" — Domaines" : "Par département"} <span style="font-size:11px;color:var(--text-light)">${histF.dept !== "Tous" ? "clic domaine ou ← retour" : "— clic pour filtrer · % taux retenu"}</span></div>
         <div class="bar-chart">${deptHtml}</div>
       </div>
       <div class="card">
