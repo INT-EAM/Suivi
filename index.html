@@ -1437,6 +1437,16 @@ async function renderHistorique(el) {
   const hTotalSoumis = hRetenus.length + hNonRetenus.length + hEnAttente.length;
   const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
 
+  // ── Taux de réponse AO (base fixe : AOs ouverts depuis le 1er avril 2026) ──
+  const TAUX_REPONSE_DATE_FROM = "2026-04-01";
+  const aosSinceApril = histAOs.filter(a => (a.dateOuverture || a.dateCreation || "") >= TAUX_REPONSE_DATE_FROM);
+  const aosSinceAprilRepondus = aosSinceApril.filter(a =>
+    a.dateReponse || ["repondu","demarrage"].includes(suiviFromPwise(a.statutPwise))
+  );
+  const tauxReponseAO     = aosSinceApril.length ? Math.round(aosSinceAprilRepondus.length / aosSinceApril.length * 100) : 0;
+  const tauxReponseAOBase = aosSinceApril.length;
+  const tauxReponseAONum  = aosSinceAprilRepondus.length;
+
   const mkHistRow = (emoji, label, items, color, key) => {
     if (!items.length) return '';
     const byBM = {};
@@ -1507,7 +1517,9 @@ async function renderHistorique(el) {
       <div class="kpi"><div class="kpi-value" style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</div><div class="kpi-label">Taux reçu→retenu</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${avgJours||"—"}</div><div class="kpi-label">Jours moy.</div><div class="kpi-sub">par mission</div></div>
+      <div class="kpi" style="border-top:3px solid #3b82f6"><div class="kpi-value" style="color:${tauxReponseAO>=50?"var(--green)":tauxReponseAO>=30?"var(--amber)":"var(--red)"}">${tauxReponseAO}%</div><div class="kpi-label">Taux réponse AO †</div><div class="kpi-sub">${tauxReponseAONum} / ${tauxReponseAOBase} AOs</div></div>
     </div>
+    <div style="font-size:11px;color:var(--text-light);text-align:right;margin:-14px 0 14px;padding-right:4px">† Taux de réponse calculé uniquement sur les AOs ouverts depuis le 1<sup>er</sup> avril 2026 (${tauxReponseAOBase} AOs · tous périmètres · filtres non appliqués)</div>
 
     <div class="dash-grid">
       <div class="card"><div class="card-title">🔄 Funnel global</div>${funnelHtml}</div>
