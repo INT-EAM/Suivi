@@ -1139,8 +1139,9 @@ function renderListe(el) {
 }
 
 function renderDetail(el, rfc) {
-  const ao = allAOs.find(a=>a.rfc===rfc);
+  const ao = allAOs.find(a=>a.rfc===rfc) || histAOs.find(a=>a.rfc===rfc);
   if(!ao) return;
+  const isHistCtx = el.id === "hist-detail-area";
   el.innerHTML = `
     <div class="card detail-panel">
       <div class="detail-header">
@@ -1197,7 +1198,10 @@ function renderDetail(el, rfc) {
       </div>
     </div>
   `;
-  document.getElementById("close-detail").addEventListener("click",()=>{selectedRFC=null;renderView();});
+  document.getElementById("close-detail").addEventListener("click",()=>{
+    if(isHistCtx) { el.innerHTML=''; el.scrollIntoView({behavior:"smooth",block:"nearest"}); }
+    else { selectedRFC=null; renderView(); }
+  });
   document.getElementById("d_qualif").addEventListener("change",e=>{
     document.getElementById("qualif-date-field").style.display=e.target.value?"":"none";
     if(e.target.value&&!document.getElementById("d_dateQualif").value) document.getElementById("d_dateQualif").value=today();
@@ -1220,20 +1224,31 @@ function renderDetail(el, rfc) {
     ao.statut = ao.dateCloture ? "clos" : "ouvert";
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
     await dbPut("aos", stampAO(ao, "suivi mis à jour"));
-    renderView();
+    if(isHistCtx) {
+      histAOs = histAOs.map(a => a.rfc === ao.rfc ? ao : a);
+      renderDetail(el, rfc);
+    } else { renderView(); }
   });
   document.getElementById("clear-detail").addEventListener("click",async()=>{
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
     ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
     await dbPut("aos", stampAO(ao, "suivi effacé"));
-    renderView();
+    if(isHistCtx) {
+      histAOs = histAOs.map(a => a.rfc === ao.rfc ? ao : a);
+      renderDetail(el, rfc);
+    } else { renderView(); }
   });
   document.getElementById("delete-ao").addEventListener("click",async()=>{
     if(!confirm("⚠️ Supprimer définitivement "+ao.rfc+" ?\n\nCet AO sera effacé de la base et n'apparaîtra plus, même après import PWise.\n\nCette action est irréversible.")) return;
     await dbDelete(ao.rfc);
-    selectedRFC = null;
-    allAOs = allAOs.filter(a => a.rfc !== ao.rfc);
-    renderView();
+    if(isHistCtx) {
+      histAOs = histAOs.filter(a => a.rfc !== ao.rfc);
+      el.innerHTML = '';
+    } else {
+      selectedRFC = null;
+      allAOs = allAOs.filter(a => a.rfc !== ao.rfc);
+      renderView();
+    }
   });
 }
 
@@ -1683,7 +1698,7 @@ async function renderHistorique(el) {
 
     let rows = sorted.map(a => {
       const cat = categorize(a.profil);
-      return `<tr style="border-bottom:1px solid #f8fafc;background:${statutColor(a.statutPwise)}">
+      return `<tr class="hist-ao-row" data-rfc="${a.rfc}" style="border-bottom:1px solid #f8fafc;background:${statutColor(a.statutPwise)};cursor:pointer;transition:filter 0.1s" onmouseover="this.style.filter='brightness(0.95)'" onmouseout="this.style.filter=''">
         <td style="padding:6px 8px;font-family:monospace;font-size:11px;color:#475569">${a.rfc.replace("RFC00000","").replace("RFC0000","").replace("RFC000","")}</td>
         <td style="padding:6px 8px"><span class="badge" style="background:${CAT_COLORS[cat]};font-size:10px">${cat}</span></td>
         <td style="padding:6px 8px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${a.profil}">${a.profil}</td>
@@ -1697,7 +1712,7 @@ async function renderHistorique(el) {
 
     panel.innerHTML = `<div class="card" style="margin-top:16px">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span>📋 Liste des ${f.length} AO filtrés</span>
+        <span>📋 Liste des ${f.length} AO filtrés <span style="font-size:11px;font-weight:400;color:var(--text-light)">— cliquez une ligne pour voir le détail</span></span>
         <button class="btn" id="hist-list-close" style="font-size:11px;padding:3px 10px">✕ Fermer</button>
       </div>
       <div class="table-wrap">
@@ -1715,9 +1730,28 @@ async function renderHistorique(el) {
           <tbody>${rows}</tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+    <div id="hist-detail-area"></div>`;
 
-    document.getElementById("hist-list-close").addEventListener("click", () => { panel.innerHTML = ''; });
+    document.getElementById("hist-list-close").addEventListener("click", () => {
+      panel.innerHTML = '';
+    });
+
+    document.querySelectorAll(".hist-ao-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const rfc = row.dataset.rfc;
+        // Highlight selected row
+        document.querySelectorAll(".hist-ao-row").forEach(r => r.style.outline = "");
+        row.style.outline = "2px solid var(--blue)";
+        row.style.outlineOffset = "-2px";
+        const detailArea = document.getElementById("hist-detail-area");
+        if (detailArea) {
+          renderDetail(detailArea, rfc);
+          setTimeout(() => detailArea.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        }
+      });
+    });
+
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
