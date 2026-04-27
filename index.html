@@ -800,13 +800,19 @@ function renderDashboard(el) {
   }
 
   // ── Résultats & pertes ──
-  // Source : tous les AOs (pas seulement filtrés) pour avoir le vrai bilan
-  const srcAll = allAOs; // tous périmètres actifs
-  const soumisRetenus    = srcAll.filter(a => a.dateReponse && a.dateDemarrage);
-  const soumisNonRetenus = srcAll.filter(a => a.dateReponse && !a.dateDemarrage && /non retenu/i.test(a.statutPwise||''));
-  const soumisEnAttente  = srcAll.filter(a => a.dateReponse && !a.dateDemarrage && !/non retenu/i.test(a.statutPwise||''));
-  const partisNonSoumis  = srcAll.filter(a => !a.dateReponse && /non retenu/i.test(a.statutPwise||'')); // ← cas clé demandé
-  const ouvertsNonSoumis = srcAll.filter(a => !a.dateReponse && a.statut !== 'clos' && !/non retenu/i.test(a.statutPwise||''));
+  // Source : AOs du dashboard filtrés (respect dashDateFrom + filtres actifs dept/domain/bm/cat)
+  const srcDash = getDashAOs().filter(a => {
+    if(dashF.dept   && a.dept !== dashF.dept) return false;
+    if(dashF.domain && domainGroup(a.org) !== dashF.domain) return false;
+    if(dashF.bm     && (a.bm||'Non assigné') !== dashF.bm) return false;
+    if(dashF.cat    && categorize(a.profil) !== dashF.cat) return false;
+    return true;
+  });
+  const soumisRetenus    = srcDash.filter(a => a.dateReponse && a.dateDemarrage);
+  const soumisNonRetenus = srcDash.filter(a => a.dateReponse && !a.dateDemarrage && /non retenu/i.test(a.statutPwise||''));
+  const soumisEnAttente  = srcDash.filter(a => a.dateReponse && !a.dateDemarrage && !/non retenu/i.test(a.statutPwise||''));
+  const partisNonSoumis  = srcDash.filter(a => !a.dateReponse && /non retenu/i.test(a.statutPwise||''));
+  const ouvertsNonSoumis = srcDash.filter(a => !a.dateReponse && a.statut !== 'clos' && !/non retenu/i.test(a.statutPwise||''));
 
   const totalSoumis = soumisRetenus.length + soumisNonRetenus.length + soumisEnAttente.length;
   const winRate = totalSoumis ? Math.round(soumisRetenus.length / totalSoumis * 100) : 0;
@@ -1437,9 +1443,15 @@ async function renderHistorique(el) {
   const hTotalSoumis = hRetenus.length + hNonRetenus.length + hEnAttente.length;
   const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
 
-  // ── Taux de réponse AO (base fixe : AOs ouverts depuis le 1er avril 2026) ──
+  // ── Taux de réponse AO (depuis le 1er avril 2026, filtres actifs appliqués) ──
   const TAUX_REPONSE_DATE_FROM = "2026-04-01";
-  const aosSinceApril = histAOs.filter(a => (a.dateOuverture || a.dateCreation || "") >= TAUX_REPONSE_DATE_FROM);
+  const aosSinceApril = histAOs.filter(a => {
+    if ((a.dateOuverture || a.dateCreation || "") < TAUX_REPONSE_DATE_FROM) return false;
+    if (histF.dept   !== "Tous" && a.dept !== histF.dept) return false;
+    if (histF.domain !== "Tous" && domainGroup(a.org) !== histF.domain) return false;
+    if (histF.cat    !== "Tous" && categorize(a.profil) !== histF.cat) return false;
+    return true;
+  });
   const aosSinceAprilRepondus = aosSinceApril.filter(a =>
     a.dateReponse || ["repondu","demarrage"].includes(suiviFromPwise(a.statutPwise))
   );
@@ -1519,9 +1531,7 @@ async function renderHistorique(el) {
       <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${avgJours||"—"}</div><div class="kpi-label">Jours moy.</div><div class="kpi-sub">par mission</div></div>
       <div class="kpi" style="border-top:3px solid #3b82f6"><div class="kpi-value" style="color:${tauxReponseAO>=50?"var(--green)":tauxReponseAO>=30?"var(--amber)":"var(--red)"}">${tauxReponseAO}%</div><div class="kpi-label">Taux réponse AO †</div><div class="kpi-sub">${tauxReponseAONum} / ${tauxReponseAOBase} AOs</div></div>
     </div>
-    <div style="font-size:11px;color:var(--text-light);text-align:right;margin:-14px 0 14px;padding-right:4px">† Taux de réponse calculé uniquement sur les AOs ouverts depuis le 1<sup>er</sup> avril 2026 (${tauxReponseAOBase} AOs · tous périmètres · filtres non appliqués)</div>
-
-    <div class="dash-grid">
+    <div style="font-size:11px;color:var(--text-light);text-align:right;margin:-14px 0 14px;padding-right:4px">† AOs ouverts depuis le 1<sup>er</sup> avril 2026 · filtres dept/domaine/profil appliqués</div>
       <div class="card"><div class="card-title">🔄 Funnel global</div>${funnelHtml}</div>
       <div class="card"><div class="card-title">🏷️ Statuts PWise <span style="font-size:11px;color:var(--text-light)">— cliquez pour filtrer</span></div>${statutHtml}</div>
     </div>
