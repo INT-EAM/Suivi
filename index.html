@@ -73,6 +73,7 @@ tr.clos { opacity: 0.45; }
 .pill-qualif { background: #ede9fe; color: #6d28d9; }
 .pill-demarrage { background: #d1fae5; color: #065f46; }
 .pill-clos { background: #f1f5f9; color: #94a3b8; }
+.pill-flag-repondu { background: #cffafe; color: #0e7490; border: 1px solid #67e8f9; margin-left: 4px; }
 .pill-clos-traite { background: #dbeafe; color: #1e40af; }
 th.r { text-align: right; }
 td.r { text-align: right; }
@@ -341,7 +342,9 @@ function statutPill(s, ao) {
     return '<span class="status-pill pill-clos-traite">Clos · '+innerLabel+'</span>';
   }
   const cls={ouvert:"pill-ouvert",encours:"pill-encours",repondu:"pill-repondu",qualif:"pill-qualif",demarrage:"pill-demarrage",clos:"pill-clos",clos_nontraite:"pill-clos",clos_traite:"pill-clos-traite"}[s]||"pill-ouvert";
-  return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>';
+  const flag = (ao && ao.aRepondu && !["repondu","demarrage","clos_traite"].includes(s))
+    ? ' <span class="status-pill pill-flag-repondu" title="Réponse déjà transmise sur cet AO">✓ déjà répondu</span>' : '';
+  return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>'+flag;
 }
 
 function today(){return new Date().toISOString().slice(0,10);}
@@ -1801,7 +1804,7 @@ async function renderHistorique(el) {
 const AO_DEFAULTS = {
   bm:"", consultant:"", tjm:"", notes:"",
   datePrise:"", dateReponse:"", dateQualif:"",
-  dateDemarrage:"", dateCloture:"", dateDisparition:""
+  dateDemarrage:"", dateCloture:"", dateDisparition:"", aRepondu:false
 };
 
 function buildNewAO(p, { isHistorique = false } = {}) {
@@ -1811,9 +1814,9 @@ function buildNewAO(p, { isHistorique = false } = {}) {
 
 // ── (O) Règles de statut PWise — données extensibles ──
 const PWISE_STATUS_RULES = [
-  { test: sp => /non retenu/i.test(sp),   apply: ()  => ({ statut:"clos", dateCloture: today() }) },
-  { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => !ao.dateDemarrage ? { dateDemarrage: today() } : null },
-  { test: sp => /soumis/i.test(sp),       apply: ao  => !ao.dateReponse   ? { dateReponse:  today() } : null },
+  { test: sp => /non retenu/i.test(sp),   apply: ()  => ({ statut:"clos", dateCloture: today(), aRepondu:true }) },
+  { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => ({ aRepondu:true, ...(ao.dateDemarrage ? {} : { dateDemarrage: today() }) }) },
+  { test: sp => /soumis/i.test(sp),       apply: ao  => ({ aRepondu:true, ...(ao.dateReponse   ? {} : { dateReponse:  today() }) }) },
 ];
 
 // ── (S) Application des règles — isolée du reste ──
@@ -1854,7 +1857,7 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
       const changed = ex.profil !== p.profil || ex.nbJours !== p.nbJours || ex.dateDebut !== p.dateDebut;
       toSave.push({
         ...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport: today(),
-        bm: ex.bm||"", datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"",
+        bm: ex.bm||"", datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"", aRepondu: ex.aRepondu||false,
         consultant: ex.consultant||"", tjm: ex.tjm||"", dateQualif: ex.dateQualif||"",
         dateDemarrage: ex.dateDemarrage||"", notes: ex.notes||"",
         dateOuverture: ex.dateOuverture || ex.dateCreation || today(),
