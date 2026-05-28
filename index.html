@@ -811,11 +811,11 @@ function renderDashboard(el) {
     if(dashF.cat    && categorize(a.profil) !== dashF.cat) return false;
     return true;
   });
-  const soumisRetenus    = srcDash.filter(a => a.dateReponse && a.dateDemarrage);
-  const soumisNonRetenus = srcDash.filter(a => a.dateReponse && !a.dateDemarrage && /non retenu/i.test(a.statutPwise||''));
-  const soumisEnAttente  = srcDash.filter(a => a.dateReponse && !a.dateDemarrage && !/non retenu/i.test(a.statutPwise||''));
-  const partisNonSoumis  = srcDash.filter(a => !a.dateReponse && /non retenu/i.test(a.statutPwise||''));
-  const ouvertsNonSoumis = srcDash.filter(a => !a.dateReponse && a.statut !== 'clos' && !/non retenu/i.test(a.statutPwise||''));
+  const soumisRetenus    = srcDash.filter(a => aReponduAO(a) && estRetenuAO(a));
+  const soumisNonRetenus = srcDash.filter(a => aReponduAO(a) && !estRetenuAO(a) && estNonRetenuAO(a));
+  const soumisEnAttente  = srcDash.filter(a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a));
+  const partisNonSoumis  = srcDash.filter(a => !aReponduAO(a) && a.statut === 'clos');
+  const ouvertsNonSoumis = srcDash.filter(a => !aReponduAO(a) && a.statut !== 'clos');
 
   const totalSoumis = soumisRetenus.length + soumisNonRetenus.length + soumisEnAttente.length;
   const winRate = totalSoumis ? Math.round(soumisRetenus.length / totalSoumis * 100) : 0;
@@ -944,11 +944,11 @@ function renderDashboard(el) {
 
   // ── Résultats & pertes — clics vers liste filtrée ──
   const resMap = {
-    retenus:        a => a.dateReponse && a.dateDemarrage,
-    nonRetenus:     a => a.dateReponse && !a.dateDemarrage && /non retenu/i.test(a.statutPwise||''),
-    attente:        a => a.dateReponse && !a.dateDemarrage && !/non retenu/i.test(a.statutPwise||''),
-    partis:         a => !a.dateReponse && /non retenu/i.test(a.statutPwise||''),
-    ouvertsNonSoumis: a => !a.dateReponse && a.statut !== 'clos' && !/non retenu/i.test(a.statutPwise||''),
+    retenus:        a => aReponduAO(a) && estRetenuAO(a),
+    nonRetenus:     a => aReponduAO(a) && !estRetenuAO(a) && estNonRetenuAO(a),
+    attente:        a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a),
+    partis:         a => !aReponduAO(a) && a.statut === 'clos',
+    ouvertsNonSoumis: a => !aReponduAO(a) && a.statut !== 'clos',
   };
   document.querySelectorAll(".res-row").forEach(row => {
     row.addEventListener("click", () => {
@@ -1266,6 +1266,15 @@ function suiviFromPwise(sp) {
   return "encours";
 }
 
+// "INTM a répondu" — preuve de réponse robuste aux ré-ouvertures PWise.
+// Un AO non retenu / retenu prouve qu'on a répondu, même sans dateReponse captée.
+function aReponduAO(a) {
+  return !!(a.dateReponse || a.aRepondu || a.dateDemarrage ||
+    ["repondu","demarrage","clos"].includes(suiviFromPwise(a.statutPwise)));
+}
+function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage" || !!a.dateDemarrage; }
+function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
+
 async function renderHistorique(el) {
   await loadHistoricalAOs();
   if (!histAOs.length) {
@@ -1488,11 +1497,11 @@ async function renderHistorique(el) {
   }
 
   // ── Résultats & pertes (sur les AOs filtrés) ──
-  const hRetenus        = f.filter(a => a.dateReponse && a.dateDemarrage);
-  const hNonRetenus     = f.filter(a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) === 'clos');
-  const hEnAttente      = f.filter(a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) !== 'clos');
-  const hPartisNonSoumis= f.filter(a => !a.dateReponse && suiviFromPwise(a.statutPwise) === 'clos');
-  const hOuvertsNonSoumis = f.filter(a => !a.dateReponse && a.statut !== 'clos' && suiviFromPwise(a.statutPwise) !== 'clos');
+  const hRetenus        = f.filter(a => aReponduAO(a) && estRetenuAO(a));
+  const hNonRetenus     = f.filter(a => aReponduAO(a) && !estRetenuAO(a) && estNonRetenuAO(a));
+  const hEnAttente      = f.filter(a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a));
+  const hPartisNonSoumis= f.filter(a => !aReponduAO(a) && a.statut === 'clos');
+  const hOuvertsNonSoumis = f.filter(a => !aReponduAO(a) && a.statut !== 'clos');
 
   const hTotalSoumis = hRetenus.length + hNonRetenus.length + hEnAttente.length;
   const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
@@ -1506,9 +1515,7 @@ async function renderHistorique(el) {
     if (histF.cat    !== "Tous" && categorize(a.profil) !== histF.cat) return false;
     return true;
   });
-  const aosSinceAprilRepondus = aosSinceApril.filter(a =>
-    a.dateReponse || ["repondu","demarrage"].includes(suiviFromPwise(a.statutPwise))
-  );
+  const aosSinceAprilRepondus = aosSinceApril.filter(a => aReponduAO(a));
   const tauxReponseAO     = aosSinceApril.length ? Math.round(aosSinceAprilRepondus.length / aosSinceApril.length * 100) : 0;
   const tauxReponseAOBase = aosSinceApril.length;
   const tauxReponseAONum  = aosSinceAprilRepondus.length;
@@ -1611,11 +1618,11 @@ async function renderHistorique(el) {
 
   // ── Clics résultats → liste inline ──
   const histResMap = {
-    retenus:          a => a.dateReponse && a.dateDemarrage,
-    nonRetenus:       a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) === 'clos',
-    attente:          a => a.dateReponse && !a.dateDemarrage && suiviFromPwise(a.statutPwise) !== 'clos',
-    partis:           a => !a.dateReponse && suiviFromPwise(a.statutPwise) === 'clos',
-    ouvertsNonSoumis: a => !a.dateReponse && a.statut !== 'clos' && suiviFromPwise(a.statutPwise) !== 'clos',
+    retenus:          a => aReponduAO(a) && estRetenuAO(a),
+    nonRetenus:       a => aReponduAO(a) && !estRetenuAO(a) && estNonRetenuAO(a),
+    attente:          a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a),
+    partis:           a => !aReponduAO(a) && a.statut === 'clos',
+    ouvertsNonSoumis: a => !aReponduAO(a) && a.statut !== 'clos',
   };
   const histResLabels = {
     retenus:'🟢 Retenus', nonRetenus:'🔴 Non retenus', attente:'🟡 En attente',
