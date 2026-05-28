@@ -1698,6 +1698,13 @@ async function renderHistorique(el) {
       if(/soumis/i.test(s)) return '<span style="color:#f59e0b;font-size:10px;font-weight:600">🟡 Soumis</span>';
       return '<span style="color:#3b82f6;font-size:10px;font-weight:600">🔵 En cours</span>';
     };
+    // Badge "déjà répondu" : même critère que la carte Résultats & pertes (dateReponse),
+    // renforcé par le flag aRepondu pour les cas futurs (non retenu/retenu sans soumis capté).
+    const reponduFlag = a => (
+      (a.dateReponse || a.aRepondu) && suiviFromPwise(a.statutPwise) === 'encours'
+        ? ' <span style="font-size:10px;font-weight:600;color:#0e7490;background:#cffafe;border:1px solid #67e8f9;border-radius:4px;padding:1px 5px;margin-left:4px" title="INTM a déjà répondu sur cet AO">✓ déjà répondu</span>'
+        : ''
+    );
 
     let rows = sorted.map(a => {
       const cat = categorize(a.profil);
@@ -1709,7 +1716,7 @@ async function renderHistorique(el) {
         <td style="padding:6px 8px;font-size:11px">${a.dept||"—"}</td>
         <td style="padding:6px 8px;font-size:11px;white-space:nowrap">${a.dateDebut||"—"}</td>
         <td style="padding:6px 8px;text-align:right;font-size:11px">${a.nbJours||"—"}</td>
-        <td style="padding:6px 8px">${statutLabel2(a.statutPwise||"")}</td>
+        <td style="padding:6px 8px">${statutLabel2(a.statutPwise||"")}${reponduFlag(a)}</td>
       </tr>`;
     }).join("");
 
