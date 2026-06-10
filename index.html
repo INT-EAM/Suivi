@@ -2051,7 +2051,7 @@ function renderExport(el) {
     <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Export</h1>
     <div class="card">
       <div class="card-title">📤 Exporter les données</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Exportez toutes les données AO + suivi au format CSV ou JSON.</p>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Exportez l'intégralité des AOs — dashboard + historique (clôturés, archivés, domaines hors périmètre) — au format CSV ou JSON. Une colonne "Historique" distingue les AOs archivés.</p>
       <div style="display:flex;gap:10px">
         <button class="btn btn-green" onclick="doExportCSV()">📥 Export CSV</button>
         <button class="btn" onclick="doExportJSON()">📥 Export JSON (sauvegarde)</button>
@@ -2143,17 +2143,34 @@ function renderExport(el) {
   });
 }
 
-function doExportCSV(){
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO\n";
-  allAOs.forEach(a=>{
+// Jeu de données complet pour l'export : dashboard + historique, dédupliqué par RFC.
+// histAOs est chargé à la demande → on le charge si nécessaire avant d'exporter.
+async function getExportAOs(){
+  if(histAOs.length===0){
+    try{ await loadHistoricalAOs(); }
+    catch(e){ console.warn("Export : historique non chargé —", e); }
+  }
+  const seen={}, out=[];
+  allAOs.forEach(a=>{ if(a.rfc&&!seen[a.rfc]){ seen[a.rfc]=1; out.push(a); } });
+  histAOs.forEach(a=>{ if(a.rfc&&!seen[a.rfc]){ seen[a.rfc]=1; out.push(a); } });
+  return out;
+}
+
+async function doExportCSV(){
+  const aos=await getExportAOs();
+  const dashRfc={};
+  allAOs.forEach(a=>{ dashRfc[a.rfc]=1; });
+  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
+  aos.forEach(a=>{
     const ss=statutComplet(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut}\n`;
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
   });
   download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
 }
 
-function doExportJSON(){
-  const data = {version:1, exportDate:new Date().toISOString(), aos:allAOs};
+async function doExportJSON(){
+  const aos=await getExportAOs();
+  const data = {version:1, exportDate:new Date().toISOString(), aos:aos};
   download("ao_bcef_backup.json", JSON.stringify(data,null,2), "application/json");
 }
 
