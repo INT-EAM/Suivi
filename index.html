@@ -122,6 +122,20 @@ td.r { text-align: right; }
 .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width 0.3s; }
 .bar-val { width: 30px; font-weight: 700; font-size: 12px; }
 
+/* Toasts (retour visuel sauvegarde / erreurs) */
+#toast-zone { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.18); transition: opacity .3s; }
+.toast-ok { background: var(--green); }
+.toast-err { background: var(--red); }
+
+/* En-tête de tableau sticky sur les longues listes */
+.table-wrap { max-height: calc(100vh - 230px); overflow: auto; }
+thead th { position: sticky; top: 0; background: var(--gray-light); z-index: 1; }
+
+/* Accessibilité clavier */
+button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, tr.row:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
 /* Mobile menu */
 .menu-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: #0f172a; color: #fff; border: none; border-radius: 8px; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; }
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; }
@@ -224,41 +238,59 @@ async function dbGetAll(store) {
 async function dbPut(store, data) {
   if(store==="aos"){const i=memoryStore.aos.findIndex(a=>a.rfc===data.rfc);if(i>=0)memoryStore.aos[i]=data;else memoryStore.aos.push(data);}
   else memoryStore.imports.push(data);
-  if(!useSupabase) return;
+  if(!useSupabase) return true;
   try {
     const table = store==="aos"?"appels_offres":"imports";
     const body = store==="aos" ? {rfc:data.rfc, data:data} : {data:data};
-    await fetch(SUPABASE_URL+"/rest/v1/"+table, {
+    const res = await fetch(SUPABASE_URL+"/rest/v1/"+table, {
       method:"POST", headers:sbHeaders({"Prefer":"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(body)
     });
-  } catch(e) { console.error("Supabase PUT error:", e); }
+    if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
+    return true;
+  } catch(e) {
+    console.error("Supabase PUT error:", e);
+    toast("⚠️ Sauvegarde NON enregistrée en base ("+e.message+")", "err");
+    return false;
+  }
 }
 
 async function dbPutMany(store, items) {
   if(store==="aos") items.forEach(item=>{const i=memoryStore.aos.findIndex(a=>a.rfc===item.rfc);if(i>=0)memoryStore.aos[i]=item;else memoryStore.aos.push(item);});
   else memoryStore.imports.push(...items);
-  if(!useSupabase) return;
+  if(!useSupabase) return true;
   try {
     const table = store==="aos"?"appels_offres":"imports";
     const body = store==="aos"
       ? items.map(item=>({rfc:item.rfc, data:item}))
       : items.map(item=>({data:item}));
-    await fetch(SUPABASE_URL+"/rest/v1/"+table, {
+    const res = await fetch(SUPABASE_URL+"/rest/v1/"+table, {
       method:"POST", headers:sbHeaders({"Prefer":"resolution=merge-duplicates,return=minimal"}), body:JSON.stringify(body)
     });
-  } catch(e) { console.error("Supabase PUTMANY error:", e); }
+    if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
+    return true;
+  } catch(e) {
+    console.error("Supabase PUTMANY error:", e);
+    toast("⚠️ Écriture en base échouée — "+items.length+" éléments non sauvegardés ("+e.message+")", "err");
+    return false;
+  }
 }
 
 async function dbDelete(rfc) {
   // Memory
   memoryStore.aos = memoryStore.aos.filter(a => a.rfc !== rfc);
-  if(!useSupabase) return;
+  if(!useSupabase) return true;
   // Supabase
   try {
-    await fetch(SUPABASE_URL+"/rest/v1/appels_offres?rfc=eq."+encodeURIComponent(rfc), {
+    const res = await fetch(SUPABASE_URL+"/rest/v1/appels_offres?rfc=eq."+encodeURIComponent(rfc), {
       method:"DELETE", headers:sbHeaders()
     });
-  } catch(e) { console.error("Supabase DELETE error:", e); }
+    if(!res.ok) throw new Error("HTTP "+res.status+" "+res.statusText);
+    return true;
+  } catch(e) {
+    console.error("Supabase DELETE error:", e);
+    toast("⚠️ Suppression NON appliquée en base ("+e.message+")", "err");
+    return false;
+  }
 }
 
 // ===================== PARSER =====================
@@ -348,6 +380,21 @@ function statutPill(s, ao) {
 }
 
 function today(){return new Date().toISOString().slice(0,10);}
+
+// Échappement HTML — les données PWise (profil, intitulé, org, notes) peuvent
+// contenir guillemets / chevrons et casser le rendu ou les attributs title.
+function escHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+
+// Toast non bloquant — confirmation de sauvegarde et erreurs base.
+function toast(msg, type="ok"){
+  let zone=document.getElementById("toast-zone");
+  if(!zone){zone=document.createElement("div");zone.id="toast-zone";document.body.appendChild(zone);}
+  const t=document.createElement("div");
+  t.className="toast "+(type==="err"?"toast-err":"toast-ok");
+  t.textContent=msg;
+  zone.appendChild(t);
+  setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),350);}, type==="err"?6000:2200);
+}
 
 function periodKey(dateStr, mode) {
   const d = dateStr ? (dateStr.includes("/") ? parseDate(dateStr) : new Date(dateStr)) : null;
@@ -617,7 +664,7 @@ function renderDashboard(el) {
     const pct=Math.max(Math.round(s.n/fMax*100),s.n>0?4:0);
     const sel=s.key&&dashF.suivi===s.key;
     const clickable=!!s.key;
-    funnelHtml+='<div class="bar-row'+(clickable?' dash-click':'')+'" '+(clickable?'data-key="suivi" data-val="'+s.key+'"':'')+' style="'+(clickable?"cursor:pointer;":"")+(sel?"outline:2px solid '+s.color+';border-radius:6px;":"")+'">';
+    funnelHtml+='<div class="bar-row'+(clickable?' dash-click':'')+'" '+(clickable?'data-key="suivi" data-val="'+s.key+'"':'')+' style="'+(clickable?"cursor:pointer;":"")+(sel?"outline:2px solid "+s.color+";border-radius:6px;":"")+'">';
     funnelHtml+='<div style="width:90px;text-align:right;font-size:11px;color:var(--gray);'+(s.bold?"font-weight:700;":"")+(s.indent?"padding-left:8px;":"")+'">'+s.label+'</div>';
     funnelHtml+='<div style="flex:1;height:24px;background:var(--gray-light);border-radius:5px;overflow:hidden">';
     funnelHtml+='<div style="height:100%;width:'+pct+'%;background:'+s.color+';border-radius:5px;display:flex;align-items:center;padding-left:8px;min-width:'+(s.n>0?"28px":"0")+'">';
@@ -970,8 +1017,8 @@ function renderDashboard(el) {
         return `<tr style="border-bottom:1px solid #f8fafc;cursor:pointer" onclick="selectedRFC='${a.rfc}';navigate('liste')">
           <td style="padding:5px 8px;font-family:monospace;font-size:11px;color:#475569">${a.rfc.replace(/RFC0+/,'')}</td>
           <td style="padding:5px 8px"><span class="badge" style="background:${CAT_COLORS[cat]};font-size:10px">${cat}</span></td>
-          <td style="padding:5px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${a.profil}">${a.profil}</td>
-          <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${shortOrg(a.org)}</td>
+          <td style="padding:5px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${escHtml(a.profil)}">${escHtml(a.profil)}</td>
+          <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${escHtml(shortOrg(a.org))}</td>
           <td style="padding:5px 8px;font-size:11px">${a.bm||'<span style="color:#d1d5db">—</span>'}</td>
           <td style="padding:5px 8px;font-size:11px">${a.dateReponse||'<span style="color:#d1d5db">—</span>'}</td>
           <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${a.statutPwise||'—'}</td>
@@ -1063,22 +1110,31 @@ function renderListe(el) {
     const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
     const isClos=a.statut==="clos";
     const sel=selectedRFC===a.rfc;
-    return `<tr class="row${u&&!isClos?" urg"+u:""}${isClos?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}">
+    return `<tr class="row${u&&!isClos?" urg"+u:""}${isClos?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}" tabindex="0">
       <td class="rfc-code">${a.rfc.replace("RFC0000","").replace("RFC000","")}</td>
       <td><span class="badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
-      <td class="profil-cell" title="${a.profil}">${a.profil}</td>
-      <td class="org-cell" title="${a.org}">${shortOrg(a.org)}</td>
+      <td class="profil-cell" title="${escHtml(a.profil)}">${escHtml(a.profil)}</td>
+      <td class="org-cell" title="${escHtml(a.org)}">${escHtml(shortOrg(a.org))}</td>
       <td>${a.dateDebut}</td>
       <td class="r">${a.nbJours}</td>
       <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
-      <td>${statutPill(sc,a)}${a.notes?` <span title="${a.notes.substring(0,100).replace(/"/g,"'")}" style="cursor:help">📝</span>`:""}</td>
+      <td>${statutPill(sc,a)}${a.notes?` <span title="${escHtml(a.notes.substring(0,100))}" style="cursor:help">📝</span>`:""}</td>
       <td style="font-size:10px;color:var(--text-light);text-align:center" title="${a.modifiedAt?'Modifié le '+new Date(a.modifiedAt).toLocaleDateString('fr-FR'):''}">
         ${a.modifiedBy?`<span style="font-weight:600;color:var(--green)">${a.modifiedBy}</span>`:'—'}
       </td>
     </tr>`;
   }).join("");
+
+  if(!filtered.length){
+    tableRows = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">
+      Aucun appel d'offres ne correspond aux filtres actifs.<br>
+      <button class="btn" id="reset-filters" style="margin-top:12px">Réinitialiser les filtres</button>
+    </td></tr>`;
+  }
+
+  const sortArrow = c => sort.col===c ? (sort.dir===1?" ▲":" ▼") : "";
 
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
@@ -1108,10 +1164,10 @@ function renderListe(el) {
     <div class="table-wrap">
       <table>
         <thead><tr>
-          <th class="sortable" data-col="rfc">RFC</th>
+          <th class="sortable" data-col="rfc">RFC${sortArrow("rfc")}</th>
           <th>Cat.</th><th>Profil</th><th>Domaine</th>
-          <th class="sortable" data-col="dateDebut">Début</th>
-          <th class="sortable r" data-col="nbJours">Jours</th>
+          <th class="sortable" data-col="dateDebut">Début${sortArrow("dateDebut")}</th>
+          <th class="sortable r" data-col="nbJours">Jours${sortArrow("nbJours")}</th>
           <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th><th style="text-align:center">Modif.</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
@@ -1120,22 +1176,39 @@ function renderListe(el) {
     <div id="detail-area"></div>
   `;
 
-  document.getElementById("f_search").addEventListener("input",e=>{filters.search=e.target.value;renderListe(el);});
+  // Recherche : debounce + restauration du focus (le re-render détruisait le champ à chaque frappe)
+  let searchTimer=null;
+  document.getElementById("f_search").addEventListener("input",e=>{
+    filters.search=e.target.value;
+    clearTimeout(searchTimer);
+    searchTimer=setTimeout(()=>{
+      renderListe(el);
+      const inp=document.getElementById("f_search");
+      if(inp){ inp.focus(); const v=inp.value; inp.setSelectionRange(v.length,v.length); }
+    },200);
+  });
   document.getElementById("f_dept").addEventListener("change",e=>{filters.dept=e.target.value;renderListe(el);});
   document.getElementById("f_cat").addEventListener("change",e=>{filters.cat=e.target.value;renderListe(el);});
   document.getElementById("f_statut").addEventListener("change",e=>{filters.statut=e.target.value;renderListe(el);});
   document.getElementById("f_bm").addEventListener("change",e=>{filters.bm=e.target.value;renderListe(el);});
   document.getElementById("f_period").addEventListener("change",e=>{filters.period=e.target.value;renderListe(el);});
+  const resetBtn=document.getElementById("reset-filters");
+  if(resetBtn) resetBtn.addEventListener("click",()=>{
+    filters={search:"",dept:"Tous",cat:"Tous",statut:"Tous",period:"all",bm:"Tous"};
+    renderListe(el);
+  });
   document.querySelectorAll("th.sortable").forEach(th=>{
     th.addEventListener("click",()=>{const c=th.dataset.col;if(sort.col===c)sort.dir=-sort.dir;else{sort.col=c;sort.dir=1;}renderListe(el);});
   });
   document.querySelectorAll("tr.row").forEach(tr=>{
-    tr.addEventListener("click",()=>{
+    const openRow=()=>{
       const rfc=tr.dataset.rfc;
       selectedRFC=selectedRFC===rfc?null:rfc;
       renderListe(el);
       if(selectedRFC) document.getElementById("detail-area").scrollIntoView({behavior:"smooth",block:"nearest"});
-    });
+    };
+    tr.addEventListener("click",openRow);
+    tr.addEventListener("keydown",e=>{ if(e.key==="Enter") openRow(); });
   });
 
   if(selectedRFC) renderDetail(document.getElementById("detail-area"), selectedRFC);
@@ -1148,12 +1221,12 @@ function renderDetail(el, rfc) {
   el.innerHTML = `
     <div class="card detail-panel">
       <div class="detail-header">
-        <div><div class="detail-codes">${ao.rfc} · ${ao.tm}</div><h3>${ao.profil}</h3></div>
-        <button class="close-btn" id="close-detail">✕</button>
+        <div><div class="detail-codes">${ao.rfc} · ${ao.tm}</div><h3>${escHtml(ao.profil)}</h3></div>
+        <button class="close-btn" id="close-detail" title="Fermer (Échap)">✕</button>
       </div>
       <div class="info-grid">
-        <div><div class="lbl">Intitulé</div>${ao.intitule}</div>
-        <div><div class="lbl">Organisation</div>${ao.org}</div>
+        <div><div class="lbl">Intitulé</div>${escHtml(ao.intitule)}</div>
+        <div><div class="lbl">Organisation</div>${escHtml(ao.org)}</div>
         <div><div class="lbl">Département</div>${ao.dept}</div>
         <div><div class="lbl">Modalité</div>${ao.modalite||"—"}</div>
         <div><div class="lbl">Période</div>${ao.dateDebut} → ${ao.dateFin}</div>
@@ -1179,7 +1252,7 @@ function renderDetail(el, rfc) {
           <div class="field" id="dem-date-field" style="${ao.dateDemarrage?"":"display:none"}"><label>Date démarrage</label><input type="date" id="d_dateDemarrage" value="${ao.dateDemarrage||""}"></div>
         </div>
         <div style="margin-top:12px">
-          <div class="field"><label>📝 Notes / Commentaires</label><textarea id="d_notes" style="width:100%;height:70px;border:1px solid #d1d5db;border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none" placeholder="Ex: en attente retour client, profil envoyé le...">${ao.notes||""}</textarea></div>
+          <div class="field"><label>📝 Notes / Commentaires</label><textarea id="d_notes" style="width:100%;height:70px;border:1px solid #d1d5db;border-radius:7px;padding:8px 10px;font-size:13px;font-family:inherit;resize:vertical;outline:none" placeholder="Ex: en attente retour client, profil envoyé le...">${escHtml(ao.notes||"")}</textarea></div>
         </div>
         <div class="form-actions">
           <button class="btn btn-green" id="save-detail">💾 Enregistrer</button>
@@ -1226,7 +1299,8 @@ function renderDetail(el, rfc) {
     ao.dateCloture = document.getElementById("d_dateCloture").value;
     ao.statut = ao.dateCloture ? "clos" : "ouvert";
     if(ao.bm && !ao.datePrise) ao.datePrise = today();
-    await dbPut("aos", stampAO(ao, "suivi mis à jour"));
+    const ok = await dbPut("aos", stampAO(ao, "suivi mis à jour"));
+    if(ok) toast("✓ Suivi "+ao.rfc+" enregistré");
     if(isHistCtx) {
       histAOs = histAOs.map(a => a.rfc === ao.rfc ? ao : a);
       renderDetail(el, rfc);
@@ -1235,7 +1309,8 @@ function renderDetail(el, rfc) {
   document.getElementById("clear-detail").addEventListener("click",async()=>{
     if(!confirm("Effacer le suivi de "+ao.rfc+" ?")) return;
     ao.bm="";ao.datePrise="";ao.dateReponse="";ao.consultant="";ao.tjm="";ao.dateQualif="";ao.dateDemarrage="";ao.notes="";ao.dateCloture="";ao.statut="ouvert";
-    await dbPut("aos", stampAO(ao, "suivi effacé"));
+    const ok = await dbPut("aos", stampAO(ao, "suivi effacé"));
+    if(ok) toast("✓ Suivi "+ao.rfc+" effacé");
     if(isHistCtx) {
       histAOs = histAOs.map(a => a.rfc === ao.rfc ? ao : a);
       renderDetail(el, rfc);
@@ -1243,7 +1318,8 @@ function renderDetail(el, rfc) {
   });
   document.getElementById("delete-ao").addEventListener("click",async()=>{
     if(!confirm("⚠️ Supprimer définitivement "+ao.rfc+" ?\n\nCet AO sera effacé de la base et n'apparaîtra plus, même après import PWise.\n\nCette action est irréversible.")) return;
-    await dbDelete(ao.rfc);
+    const ok = await dbDelete(ao.rfc);
+    if(ok) toast("✓ "+ao.rfc+" supprimé");
     if(isHistCtx) {
       histAOs = histAOs.filter(a => a.rfc !== ao.rfc);
       el.innerHTML = '';
@@ -1306,13 +1382,17 @@ async function renderHistorique(el) {
   }
 
   const total     = f.length;
-  const soumis    = f.filter(a => ["repondu","demarrage"].includes(suiviFromPwise(a.statutPwise))).length;
   const retenus   = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage").length;
   const nonRetenus= f.filter(a => suiviFromPwise(a.statutPwise) === "clos").length;
   const encours   = f.filter(a => suiviFromPwise(a.statutPwise) === "encours").length;
   const reponduSeulement = f.filter(a => suiviFromPwise(a.statutPwise) === "repondu").length;
   const tauxGlobal= total ? Math.round(retenus / total * 100) : 0;
-  const tauxSoumis= soumis ? Math.round(retenus / soumis * 100) : 0;
+  // Taux soumis→retenu ALIGNÉ sur les helpers unifiés (aReponduAO/estRetenuAO) :
+  // l'ancien calcul excluait les "non retenus" du dénominateur (un non-retenu EST
+  // une soumission) et ignorait le flag sticky aRepondu et les dates de suivi.
+  const soumisU  = f.filter(a => aReponduAO(a)).length;
+  const retenusU = f.filter(a => estRetenuAO(a)).length;
+  const tauxSoumis= soumisU ? Math.round(retenusU / soumisU * 100) : 0;
 
   // TJM moyen
   const tjms = f.filter(a => a.nbJours > 0).map(a => a.nbJours);
@@ -1588,7 +1668,7 @@ async function renderHistorique(el) {
       <div class="kpi hist-click" data-key="statut" data-val="demarrage" style="cursor:pointer;${histF.statut==="demarrage"?"outline:2px solid var(--green);":""}"><div class="kpi-value" style="color:var(--green)">${retenus}</div><div class="kpi-label">Retenus ✓</div></div>
       <div class="kpi hist-click" data-key="statut" data-val="clos" style="cursor:pointer;${histF.statut==="clos"?"outline:2px solid var(--gray);":""}"><div class="kpi-value" style="color:var(--gray)">${nonRetenus}</div><div class="kpi-label">Non retenus</div></div>
       <div class="kpi"><div class="kpi-value" style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</div><div class="kpi-label">Taux reçu→retenu</div></div>
-      <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</div><div class="kpi-label">Taux soumis→retenu</div><div class="kpi-sub">${retenusU} / ${soumisU} soumis</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${avgJours||"—"}</div><div class="kpi-label">Jours moy.</div><div class="kpi-sub">par mission</div></div>
       <div class="kpi" style="border-top:3px solid #3b82f6"><div class="kpi-value" style="color:${tauxReponseAO>=50?"var(--green)":tauxReponseAO>=30?"var(--amber)":"var(--red)"}">${tauxReponseAO}%</div><div class="kpi-label">Taux réponse AO †</div><div class="kpi-sub">${tauxReponseAONum} / ${tauxReponseAOBase} AOs</div></div>
     </div>
@@ -2209,6 +2289,14 @@ async function seedIfEmpty(){
 
 async function init(){
   try {
+    // Échap ferme le panneau de détail ou le panneau résultats
+    document.addEventListener("keydown", e => {
+      if(e.key !== "Escape") return;
+      const closeBtn = document.getElementById("close-detail");
+      if(closeBtn){ closeBtn.click(); return; }
+      const resPanel = document.getElementById("res-detail-panel");
+      if(resPanel) resPanel.remove();
+    });
     await openDB();
     const statusEl=document.getElementById("db-status");
     if(useSupabase) statusEl.innerHTML='🟢 En ligne';
