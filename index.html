@@ -210,6 +210,186 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // Domaines exclus (équipe non utilisatrice de l'outil)
 const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
+// ===================== FRAMEWORK BNP × INTM 2026 =====================
+// Grille Schedule 12 — TJM max IDF (€ HT). Hors IDF / full remote = -15%.
+// Source : BNP_INTM_Framework_Segments_2026.xlsx — [code, segment, profil, niveau, expérience, tjmMaxIDF]
+const FRAMEWORK_2026 = [
+["APMOF1", "A", "Functional IT PMO", 1, "0 - 2 ans", 415],
+["APMOF2", "A", "Functional IT PMO", 2, "3 - 5 ans", 500],
+["APMOF3", "A", "Functional IT PMO", 3, "6 - 10 ans", 583],
+["APMOF4", "A", "Functional IT PMO", 4, "11+ ans", 687],
+["ACF1", "A", "IT Project Manager / Business Analyst", 1, "0 - 2 ans", 412],
+["ACF2", "A", "IT Project Manager / Business Analyst", 2, "3 - 5 ans", 487],
+["ACF3", "A", "IT Project Manager / Business Analyst", 3, "6 - 10 ans", 545],
+["ACF4", "A", "IT Project Manager / Business Analyst", 4, "11 - 15 ans", 675],
+["ACF5", "A", "IT Project Manager / Business Analyst", 5, "16+ ans", 730],
+["ACPF1", "A", "Functional IT Project Manager", 1, "0 - 2 ans", 490],
+["ACPF2", "A", "Functional IT Project Manager", 2, "3 - 5 ans", 555],
+["ACPF3", "A", "Functional IT Project Manager", 3, "6 - 10 ans", 625],
+["ACPF4", "A", "Functional IT Project Manager", 4, "11+ ans", 740],
+["AARF1", "A", "Functional IT Architect", 1, "0 - 2 ans", 445],
+["AARF2", "A", "Functional IT Architect", 2, "3 - 5 ans", 552],
+["AARF3", "A", "Functional IT Architect", 3, "6 - 10 ans", 656],
+["AARF4", "A", "Functional IT Architect", 4, "11 - 15 ans", 745],
+["AARF5", "A", "Functional IT Architect", 5, "16+ ans", 835],
+["ADPF", "A", "Project Director Functional IT", 1, "Min. 8 ans", 740],
+["AEXPF1", "A", "Functional IT Expert", 1, "8 - 11 ans", 725],
+["AEXPF2", "A", "Functional IT Expert", 2, "12 - 15 ans", 810],
+["AEXPF3", "A", "Functional IT Expert", 3, "16+ ans", 950],
+["BAP1", "B", "Programmer Analyst / Acceptance Tester", 1, "0 - 1 an", 335],
+["BAP2", "B", "Programmer Analyst / Acceptance Tester", 2, "2 - 3 ans", 370],
+["BAP3", "B", "Programmer Analyst / Acceptance Tester", 3, "4 - 5 ans", 445],
+["BAP4", "B", "Programmer Analyst / Acceptance Tester", 4, "6 - 10 ans", 505],
+["BAP5", "B", "Programmer Analyst / Acceptance Tester", 5, "11+ ans", 560],
+["BANA1", "B", "Analyst / Developer", 1, "0 - 1 an", 320],
+["BANA2", "B", "Analyst / Developer", 2, "2 - 3 ans", 425],
+["BANA3", "B", "Analyst / Developer", 3, "4 - 5 ans", 495],
+["BANA4", "B", "Analyst / Developer", 4, "6 - 10 ans", 575],
+["BANA5", "B", "Analyst / Developer", 5, "11+ ans", 675],
+["BINT1", "B", "Technical Integrator", 1, "0 - 1 an", 350],
+["BINT2", "B", "Technical Integrator", 2, "2 - 3 ans", 432],
+["BINT3", "B", "Technical Integrator", 3, "4 - 5 ans", 480],
+["BINT4", "B", "Technical Integrator", 4, "6 - 10 ans", 550],
+["BINT5", "B", "Technical Integrator", 5, "11+ ans", 645],
+["BCPA1", "B", "Technical Project Manager", 1, "0 - 2 ans", 430],
+["BCPA2", "B", "Technical Project Manager", 2, "3 - 5 ans", 500],
+["BCPA3", "B", "Technical Project Manager", 3, "6 - 10 ans", 610],
+["BCPA4", "B", "Technical Project Manager", 4, "11+ ans", 740],
+["BCAT1", "B", "Technical Architect", 1, "0 - 2 ans", 420],
+["BCAT2", "B", "Technical Architect", 2, "3 - 5 ans", 500],
+["BCAT3", "B", "Technical Architect", 3, "6 - 10 ans", 655],
+["BCAT4", "B", "Technical Architect", 4, "11 - 15 ans", 760],
+["BCAT5", "B", "Technical Architect", 5, "16+ ans", 895],
+["BDPA", "B", "Project Director", 1, "8+ ans", 800],
+["BEXPA1", "B", "Technical Expert", 1, "8 - 11 ans", 730],
+["BEXPA2", "B", "Technical Expert", 2, "12 - 15 ans", 800],
+["BEXPA3", "B", "Technical Expert", 3, "16+ ans", 900],
+["BTTF1", "B", "Functional Technical Tester", 1, "0 - 2 ans", 420],
+["BTTF2", "B", "Functional Technical Tester", 2, "3 - 5 ans", 495],
+["BTTF3", "B", "Functional Technical Tester", 3, "6 - 10 ans", 595],
+["BTTF4", "B", "Functional Technical Tester", 4, "11+ ans", 690],
+["CTCI1", "C", "Operations Technician", 1, "0 - 1 an", 270],
+["CTCI2", "C", "Operations Technician", 2, "2 - 3 ans", 305],
+["CTCI3", "C", "Operations Technician", 3, "4 - 5 ans", 350],
+["CTCI4", "C", "Operations Technician", 4, "6+ ans", 405],
+["CAEX1", "C", "Operations Analyst", 1, "0 - 1 an", 295],
+["CAEX2", "C", "Operations Analyst", 2, "2 - 3 ans", 350],
+["CAEX3", "C", "Operations Analyst", 3, "4 - 5 ans", 425],
+["CAEX4", "C", "Operations Analyst", 4, "6 - 10 ans", 470],
+["CAEX5", "C", "Operations Analyst", 5, "11+ ans", 545],
+["CSDM1", "C", "Services Delivery Manager", 1, "0 - 1 an", 400],
+["CSDM2", "C", "Services Delivery Manager", 2, "2 - 3 ans", 455],
+["CSDM3", "C", "Services Delivery Manager", 3, "4 - 5 ans", 490],
+["CSDM4", "C", "Services Delivery Manager", 4, "6 - 10 ans", 540],
+["CSDM5", "C", "Services Delivery Manager", 5, "11+ ans", 680],
+["CCMA1", "C", "Change Manager", 1, "0 - 2 ans", 390],
+["CCMA2", "C", "Change Manager", 2, "3 - 5 ans", 440],
+["CCMA3", "C", "Change Manager", 3, "6 - 10 ans", 520],
+["CCMA4", "C", "Change Manager", 4, "11+ ans", 615],
+["CIMA1", "C", "Incident Manager", 1, "0 - 2 ans", 390],
+["CIMA2", "C", "Incident Manager", 2, "3 - 5 ans", 440],
+["CIMA3", "C", "Incident Manager", 3, "6 - 10 ans", 520],
+["CIMA4", "C", "Incident Manager", 4, "11+ ans", 615],
+["CIA1", "C", "Infrastructure Engineer", 1, "0 - 1 an", 380],
+["CIA2", "C", "Infrastructure Engineer", 2, "2 - 3 ans", 420],
+["CIA3", "C", "Infrastructure Engineer", 3, "4 - 5 ans", 530],
+["CIA4", "C", "Infrastructure Engineer", 4, "6 - 10 ans", 590],
+["CIA5", "C", "Infrastructure Engineer", 5, "11+ ans", 685],
+["CADI1", "C", "Infrastructure Administrator", 1, "0 - 1 an", 400],
+["CADI2", "C", "Infrastructure Administrator", 2, "2 - 3 ans", 447],
+["CADI3", "C", "Infrastructure Administrator", 3, "4 - 5 ans", 525],
+["CADI4", "C", "Infrastructure Administrator", 4, "6 - 10 ans", 570],
+["CADI5", "C", "Infrastructure Administrator", 5, "11+ ans", 670],
+["CIAR1", "C", "Network Engineer", 1, "0 - 1 an", 420],
+["CIAR2", "C", "Network Engineer", 2, "2 - 3 ans", 480],
+["CIAR3", "C", "Network Engineer", 3, "4 - 5 ans", 560],
+["CIAR4", "C", "Network Engineer", 4, "6 - 10 ans", 640],
+["CIAR5", "C", "Network Engineer", 5, "11+ ans", 705],
+["CADR1", "C", "Network Administrator", 1, "0 - 1 an", 400],
+["CADR2", "C", "Network Administrator", 2, "2 - 3 ans", 460],
+["CADR3", "C", "Network Administrator", 3, "4 - 5 ans", 530],
+["CADR4", "C", "Network Administrator", 4, "6 - 10 ans", 575],
+["CADR5", "C", "Network Administrator", 5, "11+ ans", 655],
+["CPMOI1", "C", "Infrastructure PMO", 1, "0 - 2 ans", 430],
+["CPMOI2", "C", "Infrastructure PMO", 2, "3 - 5 ans", 535],
+["CPMOI3", "C", "Infrastructure PMO", 3, "6 - 10 ans", 650],
+["CPMOI4", "C", "Infrastructure PMO", 4, "11+ ans", 740],
+["CARI1", "C", "Infrastructure Architect", 1, "0 - 2 ans", 455],
+["CARI2", "C", "Infrastructure Architect", 2, "3 - 5 ans", 510],
+["CARI3", "C", "Infrastructure Architect", 3, "6 - 10 ans", 635],
+["CARI4", "C", "Infrastructure Architect", 4, "11 - 15 ans", 755],
+["CARI5", "C", "Infrastructure Architect", 5, "15+ ans", 880],
+["CCPI1", "C", "Infrastructure Project Manager", 1, "0 - 2 ans", 465],
+["CCPI2", "C", "Infrastructure Project Manager", 2, "3 - 5 ans", 650],
+["CCPI3", "C", "Infrastructure Project Manager", 3, "6 - 10 ans", 730],
+["CCPI4", "C", "Infrastructure Project Manager", 4, "11+ ans", 825],
+["CAPS1", "C", "Application Production Support", 1, "0 - 2 ans", 435],
+["CAPS2", "C", "Application Production Support", 2, "3 - 5 ans", 500],
+["CAPS3", "C", "Application Production Support", 3, "6 - 10 ans", 580],
+["CAPS4", "C", "Application Production Support", 4, "11+ ans", 645],
+["CDBA1", "C", "Database Administrator", 1, "0 - 2 ans", 435],
+["CDBA2", "C", "Database Administrator", 2, "3 - 5 ans", 535],
+["CDBA3", "C", "Database Administrator", 3, "6 - 10 ans", 680],
+["CDBA4", "C", "Database Administrator", 4, "11+ ans", 790],
+["CDWE1", "C", "Digital Workplace Engineer", 1, "0 - 2 ans", 465],
+["CDWE2", "C", "Digital Workplace Engineer", 2, "3 - 5 ans", 535],
+["CDWE3", "C", "Digital Workplace Engineer", 3, "6 - 10 ans", 660],
+["CDWE4", "C", "Digital Workplace Engineer", 4, "11+ ans", 760],
+["CDPI", "C", "Infrastructure Project Director", 1, "8+ ans", 800],
+["CEXPI1", "C", "Infrastructure Expert", 1, "8 - 11 ans", 695],
+["CEXPI2", "C", "Infrastructure Expert", 2, "12 - 15 ans", 780],
+["CEXPI3", "C", "Infrastructure Expert", 3, "16+ ans", 865],
+["SECCG1", "E", "Cybersecurity Governance", 1, "0 - 2 ans", 545],
+["SECCG2", "E", "Cybersecurity Governance", 2, "3 - 5 ans", 685],
+["SECCG3", "E", "Cybersecurity Governance", 3, "6 - 10 ans", 815],
+["SECCG4", "E", "Cybersecurity Governance", 4, "11+ ans", 980],
+["SECARC1", "E", "Cybersecurity Architect", 1, "0 - 2 ans", 600],
+["SECARC2", "E", "Cybersecurity Architect", 2, "3 - 5 ans", 700],
+["SECARC3", "E", "Cybersecurity Architect", 3, "6 - 10 ans", 790],
+["SECARC4", "E", "Cybersecurity Architect", 4, "11 - 15 ans", 960],
+["SECARC5", "E", "Cybersecurity Architect", 5, "16+ ans", 1200],
+["SECSR1", "E", "Security Referent", 1, "0 - 2 ans", 425],
+["SECSR4", "E", "Security Referent", 4, "11+ ans", 750],
+["SECOP1", "E", "Security Operations", 1, "0 - 2 ans", 520],
+["SECOP2", "E", "Security Operations", 2, "3 - 5 ans", 650],
+["SECOP3", "E", "Security Operations", 3, "6 - 10 ans", 755],
+["SECOP4", "E", "Security Operations", 4, "11 - 15 ans", 870],
+["SECOP5", "E", "Security Operations", 5, "15+ ans", 1000],
+["SECENG1", "E", "Security Engineer", 1, "0 - 2 ans", 475],
+["SECENG3", "E", "Security Engineer", 3, "6 - 10 ans", 680],
+["SECENG4", "E", "Security Engineer", 4, "11+ ans", 780],
+["SECCYB1", "E", "Cybersecurity Expert", 1, "0 - 2 ans", 590],
+["SECCYB2", "E", "Cybersecurity Expert", 2, "3 - 5 ans", 690],
+["SECCYB3", "E", "Cybersecurity Expert", 3, "6 - 10 ans", 790],
+["SECCYB4", "E", "Cybersecurity Expert", 4, "11 - 15 ans", 890],
+["SECCYB5", "E", "Cybersecurity Expert", 5, "16+ ans", 1020],
+["SECAUD1", "E", "Offensive Security Auditor", 1, "0 - 2 ans", 500],
+["SECAUD2", "E", "Offensive Security Auditor", 2, "3 - 5 ans", 610],
+["SECAUD3", "E", "Offensive Security Auditor", 3, "6 - 10 ans", 700],
+["SECAUD4", "E", "Offensive Security Auditor", 4, "11+ ans", 820],
+["SECDAA1", "E", "Data Security Analyst", 1, "0 - 2 ans", 500],
+["SECDAA2", "E", "Data Security Analyst", 2, "3 - 5 ans", 605],
+["SECDAA3", "E", "Data Security Analyst", 3, "6 - 10 ans", 695],
+["SECDAA4", "E", "Data Security Analyst", 4, "11+ ans", 800],
+["SECPM1", "E", "IT Risk & Cybersecurity Project Manager", 1, "0 - 2 ans", 550],
+["SECPM2", "E", "IT Risk & Cybersecurity Project Manager", 2, "3 - 5 ans", 670],
+["SECPM3", "E", "IT Risk & Cybersecurity Project Manager", 3, "6 - 10 ans", 805],
+["SECPM4", "E", "IT Risk & Cybersecurity Project Manager", 4, "11+ ans", 910],
+["SECREX1", "E", "IT Risk Expert", 1, "0 - 2 ans", 510],
+["SECREX2", "E", "IT Risk Expert", 2, "3 - 5 ans", 625],
+["SECREX3", "E", "IT Risk Expert", 3, "6 - 10 ans", 740],
+["SECREX4", "E", "IT Risk Expert", 4, "11+ ans", 900],
+["SECROP1", "E", "Security Operations Referent", 1, "0 - 2 ans", 515],
+["SECROP4", "E", "Security Operations Referent", 4, "11+ ans", 890],
+["SECRBA1", "E", "Security Risk & Compliance Analyst", 1, "0 - 2 ans", 510],
+["SECRBA2", "E", "Security Risk & Compliance Analyst", 2, "3 - 5 ans", 605],
+["SECRBA3", "E", "Security Risk & Compliance Analyst", 3, "6 - 10 ans", 765],
+["SECRBA4", "E", "Security Risk & Compliance Analyst", 4, "11+ ans", 870]
+];
+const FW_BY_CODE = Object.fromEntries(FRAMEWORK_2026.map(r=>[r[0],{code:r[0],seg:r[1],profil:r[2],niv:r[3],exp:r[4],tjmMax:r[5]}]));
+function fwInfo(code){ return FW_BY_CODE[(code||"").toUpperCase().trim()] || null; }
+function fwLabel(code){ const f=fwInfo(code); return f ? f.profil+" N"+f.niv+" ("+f.exp+") — TJM max "+f.tjmMax+"\u20ac IDF / "+Math.round(f.tjmMax*0.85)+"\u20ac hors IDF\u00b7remote" : ""; }
+function fwDatalistHtml(){ return '<datalist id="fw-codes">'+FRAMEWORK_2026.map(r=>'<option value="'+r[0]+'">'+escHtml(r[2])+' N'+r[3]+' \u00b7 Seg '+r[1]+' \u00b7 '+r[5]+'\u20ac</option>').join("")+'</datalist>'; }
 
 // ===================== BASE DE DONNÉES =====================
 let memoryStore = { aos: [], imports: [] };
@@ -515,7 +695,7 @@ function getFilteredAOs() {
   else if(filters.statut==="tous_clos") { /* all, no filter */ }
   else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
   else { /* Tous = show all including clos */ }
-  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||""].some(v=>(v||"").toLowerCase().includes(s)));}
+  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||"",a.codeFramework||""].some(v=>(v||"").toLowerCase().includes(s)));}
   if(filters.dept!=="Tous") f=f.filter(a=>a.dept===filters.dept);
   if(filters.cat!=="Tous") f=f.filter(a=>categorize(a.profil)===filters.cat);
   if(filters.bm!=="Tous") f=f.filter(a=>(a.bm||"")===(filters.bm==="—"?"":filters.bm));
@@ -1120,6 +1300,7 @@ function renderListe(el) {
       <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
+      <td class="rfc-code" title="${escHtml(fwLabel(a.codeFramework))}">${a.codeFramework||'<span class="empty-cell">—</span>'}</td>
       <td>${statutPill(sc,a)}${a.notes?` <span title="${escHtml(a.notes.substring(0,100))}" style="cursor:help">📝</span>`:""}</td>
       <td style="font-size:10px;color:var(--text-light);text-align:center" title="${a.modifiedAt?'Modifié le '+new Date(a.modifiedAt).toLocaleDateString('fr-FR'):''}">
         ${a.modifiedBy?`<span style="font-weight:600;color:var(--green)">${a.modifiedBy}</span>`:'—'}
@@ -1128,7 +1309,7 @@ function renderListe(el) {
   }).join("");
 
   if(!filtered.length){
-    tableRows = `<tr><td colspan="11" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">
+    tableRows = `<tr><td colspan="12" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">
       Aucun appel d'offres ne correspond aux filtres actifs.<br>
       <button class="btn" id="reset-filters" style="margin-top:12px">Réinitialiser les filtres</button>
     </td></tr>`;
@@ -1168,7 +1349,7 @@ function renderListe(el) {
           <th>Cat.</th><th>Profil</th><th>Domaine</th>
           <th class="sortable" data-col="dateDebut">Début${sortArrow("dateDebut")}</th>
           <th class="sortable r" data-col="nbJours">Jours${sortArrow("nbJours")}</th>
-          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Suivi</th><th style="text-align:center">Modif.</th>
+          <th>BM</th><th>Consultant</th><th class="r">TJM</th><th>Code</th><th>Suivi</th><th style="text-align:center">Modif.</th>
         </tr></thead>
         <tbody>${tableRows}</tbody>
       </table>
@@ -1242,6 +1423,8 @@ function renderDetail(el, rfc) {
           <div class="field"><label>Date réponse</label><input type="date" id="d_dateReponse" value="${ao.dateReponse||""}"></div>
           <div class="field"><label>Consultant poussé</label><input class="tri" id="d_consultant" maxlength="4" placeholder="FIB" value="${ao.consultant||""}"></div>
           <div class="field"><label>TJM proposé (€)</label><input type="number" id="d_tjm" placeholder="450" value="${ao.tjm||""}"></div>
+          <div class="field"><label>Code framework 2026</label><input id="d_codefw" list="fw-codes" maxlength="10" style="text-transform:uppercase;font-family:monospace;letter-spacing:0.5px" placeholder="ex: BANA3" value="${ao.codeFramework||""}"><div id="fw-hint" style="font-size:10px;color:var(--text-light);margin-top:2px">${fwLabel(ao.codeFramework)}</div></div>
+          ${fwDatalistHtml()}
           <div class="field"><label>Qualif obtenue</label>
             <select id="d_qualif"><option value=""${!ao.dateQualif?" selected":""}>Non</option><option value="oui"${ao.dateQualif?" selected":""}>Oui</option></select>
           </div>
@@ -1286,12 +1469,16 @@ function renderDetail(el, rfc) {
     document.getElementById("dem-date-field").style.display=e.target.value?"":"none";
     if(e.target.value&&!document.getElementById("d_dateDemarrage").value) document.getElementById("d_dateDemarrage").value=today();
   });
+  document.getElementById("d_codefw").addEventListener("input",e=>{
+    document.getElementById("fw-hint").textContent=fwLabel(e.target.value);
+  });
   document.getElementById("save-detail").addEventListener("click",async()=>{
     ao.bm = document.getElementById("d_bm").value.toUpperCase().trim();
     ao.datePrise = document.getElementById("d_datePrise").value;
     ao.dateReponse = document.getElementById("d_dateReponse").value;
     ao.consultant = document.getElementById("d_consultant").value.toUpperCase().trim();
     ao.tjm = document.getElementById("d_tjm").value;
+    ao.codeFramework = document.getElementById("d_codefw").value.toUpperCase().trim();
     ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
     ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
     ao.notes = document.getElementById("d_notes").value.trim();
@@ -1330,10 +1517,8 @@ function renderDetail(el, rfc) {
     }
   });
 }
-
 // ===================== HISTORIQUE =====================
 let histF = { dept: "Tous", cat: "Tous", statut: "Tous", domain: "Tous", statutPwise: "Tous" };
-
 function suiviFromPwise(sp) {
   if (!sp) return "encours";
   if (/non retenu/i.test(sp)) return "clos";
@@ -1341,7 +1526,6 @@ function suiviFromPwise(sp) {
   if (/soumis/i.test(sp)) return "repondu";
   return "encours";
 }
-
 // "INTM a répondu" — preuve de réponse robuste aux ré-ouvertures PWise.
 // Un AO non retenu / retenu prouve qu'on a répondu, même sans dateReponse captée.
 function aReponduAO(a) {
@@ -1350,7 +1534,6 @@ function aReponduAO(a) {
 }
 function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage" || !!a.dateDemarrage; }
 function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
-
 async function renderHistorique(el) {
   await loadHistoricalAOs();
   if (!histAOs.length) {
@@ -1364,10 +1547,8 @@ async function renderHistorique(el) {
       </div>`;
     return;
   }
-
   const depts = ["Tous", ...new Set(histAOs.map(a => a.dept).filter(Boolean))].sort();
   const cats  = ["Tous", ...new Set(histAOs.map(a => categorize(a.profil)))];
-
   // Filtrage
   let f = [...histAOs];
   if (histF.dept !== "Tous") f = f.filter(a => a.dept === histF.dept);
@@ -1380,7 +1561,6 @@ async function renderHistorique(el) {
     else if (histF.statut === "repondu") f = f.filter(a => suiviFromPwise(a.statutPwise) === "repondu");
     else if (histF.statut === "encours") f = f.filter(a => suiviFromPwise(a.statutPwise) === "encours");
   }
-
   const total     = f.length;
   const retenus   = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage").length;
   const nonRetenus= f.filter(a => suiviFromPwise(a.statutPwise) === "clos").length;
@@ -1393,11 +1573,9 @@ async function renderHistorique(el) {
   const soumisU  = f.filter(a => aReponduAO(a)).length;
   const retenusU = f.filter(a => estRetenuAO(a)).length;
   const tauxSoumis= soumisU ? Math.round(retenusU / soumisU * 100) : 0;
-
   // TJM moyen
   const tjms = f.filter(a => a.nbJours > 0).map(a => a.nbJours);
   const avgJours = tjms.length ? Math.round(tjms.reduce((a,b)=>a+b,0)/tjms.length) : 0;
-
   // Funnel global
   const funnelSteps = [
     {label:"Total reçus", n:total, color:"#475569"},
@@ -1416,7 +1594,6 @@ async function renderHistorique(el) {
   });
   funnelHtml += `<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion global : <strong style="color:${tauxGlobal>=15?"var(--green)":"var(--amber)"}">${tauxGlobal}%</strong> · Taux soumis→retenu : <strong style="color:${tauxSoumis>=30?"var(--green)":"var(--amber)"}">${tauxSoumis}%</strong></div>`;
   funnelHtml += '</div>';
-
   // Par entité
   const byDept = {};
   f.forEach(a => {
@@ -1431,7 +1608,6 @@ async function renderHistorique(el) {
   });
   const deptEntries = Object.entries(byDept).sort((a,b) => b[1].total - a[1].total);
   const maxDept = deptEntries.length ? deptEntries[0][1].total : 1;
-
   // Par domaine (top 15)
   const byDomain = {};
   f.forEach(a => {
@@ -1444,7 +1620,6 @@ async function renderHistorique(el) {
   });
   const domainEntries = Object.entries(byDomain).sort((a,b) => b[1].total - a[1].total).slice(0, 15);
   const maxDom = domainEntries.length ? domainEntries[0][1].total : 1;
-
   // Par type profil
   const byCat = {};
   f.forEach(a => {
@@ -1455,11 +1630,9 @@ async function renderHistorique(el) {
     if (s === "demarrage") byCat[c].retenu++;
     if (s === "clos") byCat[c].clos++;
   });
-
   // Statuts PWise bruts
   const byStatut = {};
   f.forEach(a => { const s = a.statutPwise||"—"; byStatut[s] = (byStatut[s]||0) + 1; });
-
   let deptHtml = '';
   // Si un dept est sélectionné → drill-down domaines de ce dept
   if (histF.dept !== "Tous") {
@@ -1512,7 +1685,6 @@ async function renderHistorique(el) {
       </div>`;
     });
   }
-
   let domHtml = '';
   domainEntries.forEach(([d, s]) => {
     const taux = s.total ? Math.round(s.retenu / s.total * 100) : 0;
@@ -1525,7 +1697,6 @@ async function renderHistorique(el) {
       <div style="width:36px;text-align:right;font-size:11px;font-weight:700;color:${taux>=15?"var(--green)":"var(--amber)"}">${taux}%</div>
     </div>`;
   });
-
   let catHtml = '<table style="width:100%;font-size:12px;border-collapse:collapse"><thead><tr style="border-bottom:1px solid var(--border)">';
   catHtml += '<th style="text-align:left;padding:5px 8px">Type profil</th><th style="text-align:center">Reçus</th><th style="text-align:center">Retenus</th><th style="text-align:center">Non ret.</th><th style="text-align:center">Taux</th><th style="text-align:center">Moy. jours</th></tr></thead><tbody>';
   Object.entries(byCat).sort((a,b) => b[1].total - a[1].total).forEach(([c,s]) => {
@@ -1543,7 +1714,6 @@ async function renderHistorique(el) {
     </tr>`;
   });
   catHtml += '</tbody></table>';
-
   let statutHtml = '';
   Object.entries(byStatut).sort((a,b) => b[1]-a[1]).forEach(([s,n]) => {
     const suivi = suiviFromPwise(s);
@@ -1557,7 +1727,6 @@ async function renderHistorique(el) {
       <div style="font-size:10px;color:var(--text-light);min-width:30px">${pct}%</div>
     </div>`;
   });
-
   // Tags filtres actifs
   const tags = [];
   if (histF.dept !== "Tous") tags.push({k:"dept", v:histF.dept});
@@ -1565,7 +1734,6 @@ async function renderHistorique(el) {
   if (histF.cat !== "Tous") tags.push({k:"cat", v:histF.cat});
   if (histF.statut !== "Tous") tags.push({k:"statut", v:{demarrage:"Retenus",clos:"Non retenus",repondu:"Soumis",encours:"En cours"}[histF.statut]||histF.statut});
   if (histF.statutPwise !== "Tous") tags.push({k:"statutPwise", v:histF.statutPwise});
-
   let tagsHtml = '';
   if (tags.length) {
     tagsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
@@ -1575,17 +1743,14 @@ async function renderHistorique(el) {
     tagsHtml += `<span class="hist-clear" style="display:inline-flex;align-items:center;padding:3px 10px;background:#fef3c7;border-radius:16px;font-size:11px;font-weight:600;color:#92400e;cursor:pointer">✕ Tout réinitialiser</span>`;
     tagsHtml += '</div>';
   }
-
   // ── Résultats & pertes (sur les AOs filtrés) ──
   const hRetenus        = f.filter(a => aReponduAO(a) && estRetenuAO(a));
   const hNonRetenus     = f.filter(a => aReponduAO(a) && !estRetenuAO(a) && estNonRetenuAO(a));
   const hEnAttente      = f.filter(a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a));
   const hPartisNonSoumis= f.filter(a => !aReponduAO(a) && a.statut === 'clos');
   const hOuvertsNonSoumis = f.filter(a => !aReponduAO(a) && a.statut !== 'clos');
-
   const hTotalSoumis = hRetenus.length + hNonRetenus.length + hEnAttente.length;
   const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
-
   // ── Taux de réponse AO (depuis le 1er avril 2026, filtres actifs appliqués) ──
   const TAUX_REPONSE_DATE_FROM = "2026-04-01";
   const aosSinceApril = histAOs.filter(a => {
@@ -1599,7 +1764,6 @@ async function renderHistorique(el) {
   const tauxReponseAO     = aosSinceApril.length ? Math.round(aosSinceAprilRepondus.length / aosSinceApril.length * 100) : 0;
   const tauxReponseAOBase = aosSinceApril.length;
   const tauxReponseAONum  = aosSinceAprilRepondus.length;
-
   const mkHistRow = (emoji, label, items, color, key) => {
     if (!items.length) return '';
     const byBM = {};
@@ -1617,7 +1781,6 @@ async function renderHistorique(el) {
       <div style="font-size:28px;font-weight:800;color:${color};min-width:36px;text-align:right">${items.length}</div>
     </div>`;
   };
-
   const resultatsHistHtml = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div>
@@ -1642,7 +1805,6 @@ async function renderHistorique(el) {
         }
       </div>
     </div>`;
-
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <h1 style="font-size:24px;font-weight:800">📈 Historique Global</h1>
@@ -1660,7 +1822,6 @@ async function renderHistorique(el) {
       </select>
     </div>
     ${tagsHtml}
-
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="kpi hist-click" data-key="statut" data-val="Tous" style="cursor:pointer;${histF.statut==="Tous"&&!tags.length?"outline:2px solid var(--blue);":""}"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">Total AO</div><div class="kpi-sub">tous périmètres</div></div>
       <div class="kpi hist-click" data-key="statut" data-val="encours" style="cursor:pointer;${histF.statut==="encours"?"outline:2px solid var(--blue);":""}"><div class="kpi-value" style="color:var(--blue)">${encours}</div><div class="kpi-label">En cours</div></div>
@@ -1695,7 +1856,6 @@ async function renderHistorique(el) {
       ${resultatsHistHtml}
     </div>
     <div id="hist-list-panel"></div>`;
-
   // ── Clics résultats → liste inline ──
   const histResMap = {
     retenus:          a => aReponduAO(a) && estRetenuAO(a),
@@ -1708,24 +1868,20 @@ async function renderHistorique(el) {
     retenus:'🟢 Retenus', nonRetenus:'🔴 Non retenus', attente:'🟡 En attente',
     partis:"⚠️ Partis sans soumission", ouvertsNonSoumis:'⏳ Ouverts non soumis'
   };
-
   document.querySelectorAll(".hist-res-row").forEach(row => {
     row.addEventListener("click", () => {
       const key    = row.dataset.key;
       const fn     = histResMap[key]; if (!fn) return;
       const matched = f.filter(fn);
       if (!matched.length) return;
-
       // Retirer panel précédent si même clé
       const prev = document.getElementById("hist-res-detail");
       if (prev) { if (prev.dataset.key === key) { prev.remove(); return; } prev.remove(); }
-
       const panel = document.createElement("div");
       panel.id = "hist-res-detail";
       panel.dataset.key = key;
       panel.className = "card";
       panel.style.marginTop = "16px";
-
       const rows = [...matched]
         .sort((a,b) => (parseDate(b.dateDebut)||0) - (parseDate(a.dateDebut)||0))
         .map(a => {
@@ -1740,7 +1896,6 @@ async function renderHistorique(el) {
             <td style="padding:5px 8px;font-size:11px;color:var(--gray)">${a.statutPwise||'—'}</td>
           </tr>`;
         }).join('');
-
       panel.innerHTML = `
         <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
           <span>${histResLabels[key]} <span style="font-weight:400;font-size:12px;color:var(--gray)">${matched.length} AO</span></span>
@@ -1758,23 +1913,19 @@ async function renderHistorique(el) {
           </tr></thead>
           <tbody>${rows}</tbody>
         </table></div>`;
-
       el.appendChild(panel);
       panel.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
-
   // ── Fonction affichage liste ──
   function showHistList() {
     const panel = document.getElementById("hist-list-panel");
     if (!panel) return;
     if (!f.length) { panel.innerHTML = ''; return; }
-
     const sorted = [...f].sort((a,b) => {
       const da = parseDate(a.dateDebut), db = parseDate(b.dateDebut);
       return (db||0) - (da||0);
     });
-
     const statutColor = s => {
       const sv = suiviFromPwise(s);
       return {demarrage:"#d1fae5",repondu:"#fef3c7",clos:"#f1f5f9",encours:"#dbeafe"}[sv]||"#f8fafc";
@@ -1792,7 +1943,6 @@ async function renderHistorique(el) {
         ? ' <span style="font-size:10px;font-weight:600;color:#0e7490;background:#cffafe;border:1px solid #67e8f9;border-radius:4px;padding:1px 5px;margin-left:4px" title="INTM a déjà répondu sur cet AO">✓ déjà répondu</span>'
         : ''
     );
-
     let rows = sorted.map(a => {
       const cat = categorize(a.profil);
       return `<tr class="hist-ao-row" data-rfc="${a.rfc}" style="border-bottom:1px solid #f8fafc;background:${statutColor(a.statutPwise)};cursor:pointer;transition:filter 0.1s" onmouseover="this.style.filter='brightness(0.95)'" onmouseout="this.style.filter=''">
@@ -1806,7 +1956,6 @@ async function renderHistorique(el) {
         <td style="padding:6px 8px">${statutLabel2(a.statutPwise||"")}${reponduFlag(a)}</td>
       </tr>`;
     }).join("");
-
     panel.innerHTML = `<div class="card" style="margin-top:16px">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         <span>📋 Liste des ${f.length} AO filtrés <span style="font-size:11px;font-weight:400;color:var(--text-light)">— cliquez une ligne pour voir le détail</span></span>
@@ -1829,11 +1978,9 @@ async function renderHistorique(el) {
       </div>
     </div>
     <div id="hist-detail-area"></div>`;
-
     document.getElementById("hist-list-close").addEventListener("click", () => {
       panel.innerHTML = '';
     });
-
     document.querySelectorAll(".hist-ao-row").forEach(row => {
       row.addEventListener("click", () => {
         const rfc = row.dataset.rfc;
@@ -1848,18 +1995,14 @@ async function renderHistorique(el) {
         }
       });
     });
-
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-
   // Afficher la liste par défaut si filtres actifs
   if (tags.length) showHistList();
-
   // ── Event listeners ──
   document.getElementById("hf_dept").addEventListener("change", e => { histF.dept = e.target.value; renderHistorique(el); });
   document.getElementById("hf_cat").addEventListener("change",  e => { histF.cat  = e.target.value; renderHistorique(el); });
   document.getElementById("hf_statut").addEventListener("change", e => { histF.statut = e.target.value; renderHistorique(el); });
-
   // Clics sur barres / lignes → filtre + liste
   document.querySelectorAll(".hist-click").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1875,7 +2018,6 @@ async function renderHistorique(el) {
       }, 50);
     });
   });
-
   // Tags — retirer un filtre
   document.querySelectorAll(".hist-tag").forEach(tag => {
     tag.addEventListener("click", () => {
@@ -1883,7 +2025,6 @@ async function renderHistorique(el) {
       renderHistorique(el);
     });
   });
-
   // Tout réinitialiser
   document.querySelectorAll(".hist-clear").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -1893,26 +2034,22 @@ async function renderHistorique(el) {
   });
 }
 // ===================== IMPORT =====================
-
 // ── (S) AO factory — construction d'un AO vierge ──
 const AO_DEFAULTS = {
   bm:"", consultant:"", tjm:"", notes:"",
   datePrise:"", dateReponse:"", dateQualif:"",
   dateDemarrage:"", dateCloture:"", dateDisparition:"", aRepondu:false
 };
-
 function buildNewAO(p, { isHistorique = false } = {}) {
   return { ...AO_DEFAULTS, ...p, isHistorique, statut:"ouvert",
     dateOuverture: today(), dateCreation: today(), dernierImport: today() };
 }
-
 // ── (O) Règles de statut PWise — données extensibles ──
 const PWISE_STATUS_RULES = [
   { test: sp => /non retenu/i.test(sp),   apply: ()  => ({ statut:"clos", dateCloture: today(), aRepondu:true }) },
   { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => ({ aRepondu:true, ...(ao.dateDemarrage ? {} : { dateDemarrage: today() }) }) },
   { test: sp => /soumis/i.test(sp),       apply: ao  => ({ aRepondu:true, ...(ao.dateReponse   ? {} : { dateReponse:  today() }) }) },
 ];
-
 // ── (S) Application des règles — isolée du reste ──
 function applyStatusRules(ao, statutPwise) {
   if (hasTraitement(ao)) return {}; // suivi actif protégé
@@ -1923,21 +2060,17 @@ function applyStatusRules(ao, statutPwise) {
   }
   return {};
 }
-
 // ── (S)(D) Moteur de sync unifié — toute la logique métier ──
 // mode: 'pwise' | 'json' | 'historique'
 async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
   const existing   = await dbGetAll("aos");
   const existingMap = Object.fromEntries(existing.map(a => [a.rfc, a]));
   const importedRFCs = new Set(parsed.map(p => p.rfc));
-
   const c = { addedDash:0, addedHist:0, updated:0, closed:0, autoClos:0, unchanged:0, pending:0 };
   const toSave = [];
-
   parsed.forEach(p => {
     const ex          = existingMap[p.rfc];
     const inPerimeter = !EXCLUDED_DOMAINS.includes(domainGroup(p.org));
-
     if (!ex) {
       // ── Nouveau AO ──
       const isHist = (mode === 'historique') || !inPerimeter;
@@ -1945,7 +2078,6 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
       inPerimeter ? c.addedDash++ : c.addedHist++;
       return;
     }
-
     if (mode === 'pwise') {
       // Import texte complet : mise à jour champs + préservation suivi
       const changed = ex.profil !== p.profil || ex.nbJours !== p.nbJours || ex.dateDebut !== p.dateDebut;
@@ -1958,13 +2090,11 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
         dateCreation:  ex.dateCreation  || today()
       });
       changed ? c.updated++ : c.unchanged++;
-
     } else if (mode === 'json') {
       // Sync JSON bookmarklet : statutPwise + règles auto
       const patch = applyStatusRules(ex, p.statutPwise);
       patch.statut === 'clos' ? c.autoClos++ : c.updated++;
       toSave.push({ ...ex, statutPwise: p.statutPwise, dernierImport: today(), ...patch });
-
     } else if (mode === 'historique') {
       // Retag sans suivi actif
       if (!ex.isHistorique && !ex.bm && !ex.datePrise) {
@@ -1979,7 +2109,6 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
       }
     }
   });
-
   // ── Gestion des absents ──
   if (mode === 'pwise') {
     existing.forEach(ex => {
@@ -1997,12 +2126,10 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
       .filter(ex => !ex.isHistorique && ex.statut !== "clos" && !importedRFCs.has(ex.rfc) && !hasTraitement(ex))
       .forEach(ex => { if (!ex.dateDisparition) toSave.push({ ...ex, dateDisparition: today() }); });
   }
-
   if (toSave.length) await dbPutMany("aos", toSave);
   if (logImport) await dbPut("imports", { date: today(), time: new Date().toLocaleTimeString("fr-FR"), nbParsed: parsed.length, ...c });
   return c;
 }
-
 // ── (S) Lecture de fichier — utilitaire pur ──
 function readFile(file) {
   return new Promise((resolve, reject) => {
@@ -2012,7 +2139,6 @@ function readFile(file) {
     reader.readAsText(file);
   });
 }
-
 // ── (S) Formatage du résultat — séparé de la logique ──
 function formatSyncResult(c, label, date = "") {
   const dateStr = date ? ` — ${date}` : "";
@@ -2030,7 +2156,6 @@ function formatSyncResult(c, label, date = "") {
     </span>
   </div>`;
 }
-
 // ── (S) Rendu UI — séparé de la logique métier ──
 // ── (S) Rendu UI — séparé de la logique métier ──
 function renderImport(el) {
@@ -2067,14 +2192,12 @@ function renderImport(el) {
     </div>
     <div id="import-history"></div>
   `;
-
   // Charger .txt → coller dans textarea
   document.getElementById("import-file").addEventListener("change", async e => {
     const file = e.target.files[0]; if (!file) return;
     document.getElementById("import-text").value = await readFile(file);
     document.getElementById("import-file-info").textContent = `📄 ${file.name}`;
   });
-
   // Charger .json → sync directe
   document.getElementById("json-sync-file").addEventListener("change", async e => {
     const file = e.target.files[0]; if (!file) return;
@@ -2092,7 +2215,6 @@ function renderImport(el) {
       loadImportHistory();
     } catch(err) { alert("Erreur : " + err.message); info.textContent = ""; }
   });
-
   // Lancer import texte
   document.getElementById("run-import").addEventListener("click", async () => {
     const raw  = document.getElementById("import-text").value.trim();
@@ -2112,7 +2234,6 @@ function renderImport(el) {
       mode === 'historique' ? "Import Historique terminé" : "Import PWise réussi !");
     loadImportHistory();
   });
-
   loadImportHistory();
 }
 async function loadImportHistory() {
@@ -2124,7 +2245,6 @@ async function loadImportHistory() {
     <table style="width:100%;font-size:12px"><thead><tr><th>Date</th><th>Heure</th><th>AO parsés</th><th>Nouveaux</th><th>Mis à jour</th><th>Clos</th></tr></thead>
     <tbody>${recent.map(i=>`<tr><td>${i.date}</td><td>${i.time}</td><td>${i.nbParsed}</td><td>${i.added}</td><td>${i.updated}</td><td>${i.closed}</td></tr>`).join("")}</tbody></table></div>`;
 }
-
 // ===================== EXPORT =====================
 function renderExport(el) {
   el.innerHTML = `
@@ -2149,7 +2269,6 @@ function renderExport(el) {
     const open=getOpenAOs();
     const now=new Date();
     const weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
-
     const total=open.length;
     const nonTraite=open.filter(a=>statutSuivi(a)==="ouvert").length;
     const reponduSemaine=open.filter(a=>a.dateReponse&&new Date(a.dateReponse)>=weekAgo).length;
@@ -2158,7 +2277,6 @@ function renderExport(el) {
     const totalRepondu=open.filter(a=>a.dateReponse).length;
     const totalQualif=open.filter(a=>a.dateQualif).length;
     const totalDem=open.filter(a=>a.dateDemarrage).length;
-
     const bms={};
     open.forEach(a=>{
       const bm=a.bm;if(!bm)return;
@@ -2169,24 +2287,19 @@ function renderExport(el) {
       if(a.dateQualif&&new Date(a.dateQualif)>=weekAgo) bms[bm].qualifSem++;
       if(a.dateDemarrage&&new Date(a.dateDemarrage)>=weekAgo) bms[bm].demSem++;
     });
-
     const urgents=open.filter(a=>urgency(a.dateDebut)>=2&&statutSuivi(a)==="ouvert");
     const avecNotes=open.filter(a=>a.notes).slice(0,5);
     const dateStr=now.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-
     let report=`📊 RAPPORT HEBDO AO BCEF — ${dateStr}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 📈 VUE D'ENSEMBLE
 • ${total} AO ouverts dont ${nonTraite} non traités
 • Funnel : ${total} ouverts → ${totalRepondu} répondus → ${totalQualif} qualifiés → ${totalDem} démarrés
 • Taux conversion global : ${total?Math.round(totalDem/total*100):0}%
-
 📅 ACTIVITÉ DE LA SEMAINE
 • ${reponduSemaine} réponse(s) envoyée(s)
 • ${qualifSemaine} qualification(s) obtenue(s)
 • ${demSemaine} démarrage(s)`;
-
     if(Object.keys(bms).length){
       report+=`\n\n👤 PAR MANAGER`;
       Object.entries(bms).sort((a,b)=>b[1].total-a[1].total).forEach(([bm,s])=>{
@@ -2198,23 +2311,19 @@ function renderExport(el) {
         if(acts.length) report+=` — semaine : ${acts.join(", ")}`;
       });
     }
-
     if(urgents.length){
       report+=`\n\n🚨 AO URGENTS (non traités, début imminent)`;
       urgents.slice(0,8).forEach(a=>{
         report+=`\n• ${a.rfc} — ${a.profil.substring(0,50)} — début ${a.dateDebut}`;
       });
     }
-
     if(avecNotes.length){
       report+=`\n\n📝 NOTES RÉCENTES`;
       avecNotes.forEach(a=>{
         report+=`\n• ${a.rfc} (${a.bm||"?"}) : ${a.notes.substring(0,80)}`;
       });
     }
-
     report+=`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nGénéré depuis INTM AO Manager`;
-
     document.getElementById("report-area").innerHTML=`
       <div style="margin-top:14px;background:#0f172a;border-radius:10px;padding:16px;position:relative">
         <button class="btn" style="position:absolute;top:10px;right:10px;font-size:11px;padding:4px 10px" onclick="navigator.clipboard.writeText(document.getElementById('report-text').textContent);this.textContent='✅ Copié !';setTimeout(()=>this.textContent='📋 Copier',1500)">📋 Copier</button>
@@ -2222,7 +2331,6 @@ function renderExport(el) {
       </div>`;
   });
 }
-
 // Jeu de données complet pour l'export : dashboard + historique, dédupliqué par RFC.
 // histAOs est chargé à la demande → on le charge si nécessaire avant d'exporter.
 async function getExportAOs(){
@@ -2235,25 +2343,22 @@ async function getExportAOs(){
   histAOs.forEach(a=>{ if(a.rfc&&!seen[a.rfc]){ seen[a.rfc]=1; out.push(a); } });
   return out;
 }
-
 async function doExportCSV(){
   const aos=await getExportAOs();
   const dashRfc={};
   allAOs.forEach(a=>{ dashRfc[a.rfc]=1; });
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
+  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Code framework;TJM max grille;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
   aos.forEach(a=>{
     const ss=statutComplet(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${a.codeFramework||""};${fwInfo(a.codeFramework)?.tjmMax??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
   });
   download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
 }
-
 async function doExportJSON(){
   const aos=await getExportAOs();
   const data = {version:1, exportDate:new Date().toISOString(), aos:aos};
   download("ao_bcef_backup.json", JSON.stringify(data,null,2), "application/json");
 }
-
 async function doImportJSON(e){
   const file=e.target.files[0]; if(!file)return;
   const text=await file.text();
@@ -2266,15 +2371,12 @@ async function doImportJSON(e){
     renderView();
   }catch(err){alert("Erreur de lecture: "+err.message);}
 }
-
 function download(filename, content, type){
   const blob=new Blob([content],{type});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;a.click();
 }
-
 // ===================== SEED =====================
 const SEED=`btnMasterDetail\nRFC00004114\nBCEF IT-RCSR 2 - 2026 - Responsabilité de suivi de correction des vulnérabilités cybersécurité_(DM))\nTM00004671\nL6_BCEF IT - RCSR 2 GESTION DES ACCES VULNERABILITES INCIDENTS CYBER\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nProject Manager Risques IT & Cyber Sécurité Niveau 2\nSur Site\n13/04/2026 - 31/12/2026\n151,00\nbtnMasterDetail\nRFC00004045\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004676\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00004038\nBCEF IT - OSBA1 - Domaine Banque Au Quotidien - Ingenieur Software Open Java\nTM00004675\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003890\nBCEF IT - Business Analyst Socle Data DHV2 (CS)\nTM00004420\nL6_BCEF IT - 2DAI 2 DATA IA\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003863\nBCEF IT - BA - Crédits Pro ER (MCS)\nTM00004311\nL6_BCEF IT - FRCR 4 FINANCEMENT CORPORATE ET TRADE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n04/05/2026 - 31/12/2026\n140,00\nbtnMasterDetail\nRFC00003835\nBCEF IT-EXCS 2 - Analyse - Développement COBOL/DB2\nTM00004167\nL6_BCEF IT - EXCS 2 EXPERTISE TECHNOLOGIE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003827\nBCEF IT_Ingénieurie Chef de projet Conception du Document - Opentext 2\nTM00004150\nL6_BCEF IT - 2DAI 3 DOCUMENT ET ARCHIVAGE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 3\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00003797\nBCEF IT-OSBA 1- BAAQ - Analyse de Test - Projet de Refonte EER Digitale (1) (CLA)\nTM00004273\nL6_BCEF IT - OSBA 1 BANQUE AU QUOTIDIEN\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003728\n[Hors CCC - Accord] BCEF BPE ACQUISITION CLIENTS COMMUNITY MANAGER RS FO\nTM00004424\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n27/04/2026 - 31/10/2026\n130,00\nbtnMasterDetail\nRFC00003679\nBCEF IT - Assurance vie - Gestion de projet (MCS)\nTM00004330\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet Technique Niveau 4\nSur Site\n27/04/2026 - 31/12/2026\n143,00\nbtnMasterDetail\nRFC00003672\nBCEF IT_MONETIQUE Business Analyse - Mon Parcours Digitale Souscription Carte\nTM00004274\nL6_BCEF IT - MDEP 5 PAIEMENTS PARTICULIERS\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n03/06/2026 - 31/12/2026\n124,00\nbtnMasterDetail\nRFC00003642\nBCEF BPE ACQUISITION DIGITALE CDP ACQUISITION rmpt IK\nTM00003799\nL6_BCEF RETAIL - ACQUISITIONS CLIENTS\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nBCEF COO ACQUISITION DIGITALE CDP ACQUISITION HORS MEDIA\nSur Site\n13/04/2026 - 30/09/2026\n118,00\nbtnMasterDetail\nRFC00003372\nBCEF IT - CBO - Analyse de Test - Contrat d Offres (CLA)\nTM00003975\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n30/03/2026 - 31/12/2026\n159,00\nbtnMasterDetail\nRFC00003355\nChargé de mission Entrée en relation digitale_BCEF Retail Domaine BAQ (CLA)\nTM00003847\nL6T_BCEF RETAIL - DOMAINE BANCASSURANCE AU QUOTIDIEN\nL4_BCEF RETAIL\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 2\nSur Site\n06/04/2026 - 30/09/2026\n122,00\nbtnMasterDetail\nRFC00003294\nBCEF IT - CP Senior Mise en oeuvre exigences DCC2 - FRCR5 - CP IT Senior - Refonte parcours débiteur (CS)\nTM00004067\nL6_BCEF IT - FRCR 5 SOCLE CREDITS ET RISQUES\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n01/04/2026 - 30/06/2026\n50,00\nbtnMasterDetail\nRFC00003018\nBCEF IT - OSBA2 - Domaine Core Banking et Offres - Ingenieur Software Open Java\nTM00003880\nL6_BCEF IT - OSBA 2 SOCLES COMPTES ET FACTURATION\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nAnalyste / Développeur Niveau 5\nSur Site\n06/04/2026 - 31/12/2026\n155,00\nbtnMasterDetail\nRFC00002985\nBCEF IT - Epargne - Analyst de Test - Reporting Transverses (CLA)\nTM00001894\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 3\nSur Site\n02/03/2026 - 31/12/2026\n175,00\nbtnMasterDetail\nRFC00001175\nBCEF IT - OSBA4 - Epargne - BA - Reporting Transverses\nTM00001974\nL6_BCEF IT - OSBA 4 EPARGNE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChargé de mission / Business Analyst (ex Consultant Fonctionnel) Niveau 4\nSur Site\n20/04/2026 - 31/12/2026\n147,00\nbtnMasterDetail\nRFC00000929\nBCEF IT Projet Gestion Sous Mandat (CLA)\nTM00001888\nL6_BCEF IT - OSBA 7 SOLUTIONS EPARGNE FINANCIERE\nL4_BCEF IT\nRéponse fournisseur en cours\nbtnMasterDetail\nChef de Projet IT Fonctionnel Niveau 4\nSur Site\n16/03/2026 - 31/12/2026\n167,00`;
-
 async function seedIfEmpty(){
   const existing = await dbGetAll("aos");
   if(existing.length > 0) return;
@@ -2286,7 +2388,6 @@ async function seedIfEmpty(){
   await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:toSave.length, updated:0, closed:0, unchanged:0});
   console.log("Seed: "+toSave.length+" AO importés ("+EXCLUDED_DOMAINS.join(",")+' exclus)');
 }
-
 async function init(){
   try {
     // Échap ferme le panneau de détail ou le panneau résultats
@@ -2303,7 +2404,6 @@ async function init(){
     else statusEl.innerHTML='🟡 Mode local';
     statusEl.style.background=useSupabase?"rgba(0,145,90,0.15)":"rgba(245,158,11,0.15)";
     statusEl.style.color=useSupabase?"#4ade80":"#fbbf24";
-
     // Init badge utilisateur
     renderUserBadge();
     if(!currentUser) {
@@ -2313,7 +2413,6 @@ async function init(){
       }, 800);
     }
     await seedIfEmpty();
-
     const menuBtn=document.getElementById("menu-toggle");
     const sidebar=document.getElementById("sidebar");
     const overlay=document.getElementById("sidebar-overlay");
@@ -2321,7 +2420,6 @@ async function init(){
     function closeMenu(){ sidebar.classList.remove("open"); overlay.classList.remove("open"); }
     menuBtn.addEventListener("click", toggleMenu);
     overlay.addEventListener("click", closeMenu);
-
     document.querySelectorAll(".nav-item").forEach(n=>{
       n.addEventListener("click",()=>{ closeMenu(); navigate(n.dataset.view); });
     });
@@ -2330,7 +2428,6 @@ async function init(){
     document.getElementById("main-content").innerHTML='<div style="padding:40px;color:red;font-size:14px"><h2>Erreur au chargement</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
   }
 }
-
 init();
 </script>
 </body>
