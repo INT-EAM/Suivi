@@ -13,7 +13,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
 a { color: var(--green); text-decoration: none; }
-
 /* Layout */
 .app { display: flex; min-height: 100vh; }
 .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
@@ -27,24 +26,20 @@ a { color: var(--green); text-decoration: none; }
 .nav-item .icon { font-size: 16px; width: 22px; text-align: center; }
 .nav-badge { margin-left: auto; background: var(--green); color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
 .main { margin-left: 220px; flex: 1; padding: 24px 28px; max-width: 1200px; }
-
 /* Cards */
 .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 18px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--gray); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-
 /* KPI Grid */
 .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .kpi { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 16px; }
 .kpi-value { font-size: 32px; font-weight: 800; line-height: 1.1; }
 .kpi-label { font-size: 12px; color: var(--gray); margin-top: 4px; }
 .kpi-sub { font-size: 11px; color: var(--text-light); margin-top: 2px; }
-
 /* Filters Bar */
 .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
 .filter-bar select, .filter-bar input { padding: 7px 12px; border-radius: 8px; border: 1px solid #d1d5db; font-size: 13px; outline: none; background: #fff; }
 .filter-bar input[type=text] { flex: 1; min-width: 180px; }
 .filter-bar input:focus, .filter-bar select:focus { border-color: var(--green); }
-
 /* Table */
 .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); background: #fff; }
 table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -77,7 +72,6 @@ tr.clos { opacity: 0.45; }
 .pill-clos-traite { background: #dbeafe; color: #1e40af; }
 th.r { text-align: right; }
 td.r { text-align: right; }
-
 /* Detail Panel */
 .detail-panel { margin-top: 16px; animation: slideIn 0.15s ease; }
 @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
@@ -103,7 +97,6 @@ td.r { text-align: right; }
 .btn-green:hover { background: var(--green-dark); }
 .btn-red { color: var(--red); border-color: #fecaca; }
 .btn-red:hover { background: #fef2f2; }
-
 /* Import */
 .import-zone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.15s; }
 .import-zone:hover { border-color: var(--green); background: #f0fdf4; }
@@ -113,7 +106,6 @@ td.r { text-align: right; }
 .import-result { margin-top: 16px; padding: 16px; border-radius: 10px; font-size: 13px; }
 .import-ok { background: #d1fae5; border: 1px solid #86efac; color: #065f46; }
 .import-warn { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
-
 /* Charts (simple bars) */
 .bar-chart { display: flex; flex-direction: column; gap: 6px; }
 .bar-row { display: flex; align-items: center; gap: 10px; font-size: 12px; }
@@ -121,25 +113,20 @@ td.r { text-align: right; }
 .bar-track { flex: 1; height: 22px; background: var(--gray-light); border-radius: 6px; overflow: hidden; }
 .bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; padding-left: 8px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width 0.3s; }
 .bar-val { width: 30px; font-weight: 700; font-size: 12px; }
-
 /* Toasts (retour visuel sauvegarde / erreurs) */
 #toast-zone { position: fixed; bottom: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.18); transition: opacity .3s; }
 .toast-ok { background: var(--green); }
 .toast-err { background: var(--red); }
-
 /* En-tête de tableau sticky sur les longues listes */
 .table-wrap { max-height: calc(100vh - 230px); overflow: auto; }
 thead th { position: sticky; top: 0; background: var(--gray-light); z-index: 1; }
-
 /* Accessibilité clavier */
 button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, tr.row:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-
 /* Mobile menu */
 .menu-toggle { display: none; position: fixed; top: 12px; left: 12px; z-index: 1001; background: #0f172a; color: #fff; border: none; border-radius: 8px; width: 40px; height: 40px; font-size: 20px; cursor: pointer; align-items: center; justify-content: center; }
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999; }
-
 /* Tablet */
 @media (max-width: 900px) {
   .menu-toggle { display: flex; }
@@ -161,7 +148,6 @@ button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus
   .profil-cell { max-width: 140px; }
   .org-cell { max-width: 100px; }
 }
-
 /* Mobile */
 @media (max-width: 600px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
@@ -199,15 +185,12 @@ button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus
       <div id="db-status" style="font-size:10px;padding:6px 10px;border-radius:6px;text-align:center"></div>
     </div>
   </nav>
-
   <div class="main" id="main-content"></div>
 </div>
-
 <script>
 // ===================== CONFIGURATION SUPABASE =====================
 const SUPABASE_URL = "https://tjlrhacczpdtgtiutjlm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqbHJoYWNjenBkdGd0aXV0amxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzcxNTIsImV4cCI6MjA5MTI1MzE1Mn0.iBBvWvBtVHWf6s9eRb1cF9TgDqWBdl_8Bc3y6KH8lA4";
-
 // Domaines exclus (équipe non utilisatrice de l'outil)
 const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
 // ===================== FRAMEWORK BNP × INTM 2026 =====================
@@ -384,15 +367,201 @@ const FRAMEWORK_2026 = [
 ["SECRBA1", "E", "Security Risk & Compliance Analyst", 1, "0 - 2 ans", 510],
 ["SECRBA2", "E", "Security Risk & Compliance Analyst", 2, "3 - 5 ans", 605],
 ["SECRBA3", "E", "Security Risk & Compliance Analyst", 3, "6 - 10 ans", 765],
-["SECRBA4", "E", "Security Risk & Compliance Analyst", 4, "11+ ans", 870]
+["SECRBA4", "E", "Security Risk & Compliance Analyst", 4, "11+ ans", 870],
+["DDDA1", "D", "Data Analyst", 1, "0 - 1 an", 486],
+["DDDA2", "D", "Data Analyst", 2, "2 - 3 ans", 585],
+["DDDA3", "D", "Data Analyst", 3, "4 - 5 ans", 710],
+["DDDE1", "D", "Data Engineer", 1, "0 - 1 an", 520],
+["DDDE2", "D", "Data Engineer", 2, "2 - 3 ans", 680],
+["DDDE3", "D", "Data Engineer", 3, "4 - 5 ans", 750],
+["DDDE4", "D", "Data Engineer", 4, "6+ ans", 820],
+["DDDS1", "D", "Data Scientist", 1, "0 - 1 an", 535],
+["DDDS2", "D", "Data Scientist", 2, "2 - 3 ans", 695],
+["DDDS3", "D", "Data Scientist", 3, "4+ ans", 835],
+["DLDS1", "D", "Lead Data Scientist", 1, "3 - 5 ans", 690],
+["DLDS2", "D", "Lead Data Scientist", 2, "6+ ans", 830],
+["DDDW1", "D", "Data Steward", 1, "0 - 1 an", 535],
+["DDDW2", "D", "Data Steward", 2, "2 - 3 ans", 640],
+["DDDW3", "D", "Data Steward", 3, "4+ ans", 800],
+["DDSO1", "D", "Data Security Officer", 1, "0 - 1 an", 560],
+["DDSO2", "D", "Data Security Officer", 2, "2 - 3 ans", 700],
+["DDSO3", "D", "Data Security Officer", 3, "4+ ans", 865],
+["DDAR1", "D", "Data Architect", 1, "0 - 1 an", 640],
+["DDAR2", "D", "Data Architect", 2, "2 - 3 ans", 820],
+["DDAR3", "D", "Data Architect", 3, "4 - 5 ans", 970],
+["DDAR4", "D", "Data Architect", 4, "6+ ans", 1070],
+["DDSE1", "D", "Data Service", 1, "0 - 1 an", 535],
+["DDSE2", "D", "Data Service", 2, "2 - 3 ans", 675],
+["DDSE3", "D", "Data Service", 3, "4+ ans", 805],
+["DDRT1", "D", "Technical Referent", 1, "0 - 1 an", 595],
+["DDRT2", "D", "Technical Referent", 2, "2 - 3 ans", 770],
+["DDRT3", "D", "Technical Referent", 3, "4+ ans", 930],
+["ADUX1", "F", "UX Designer", 1, "0 - 2 ans", 450],
+["ADUX2", "F", "UX Designer", 2, "3 - 5 ans", 550],
+["ADUX3", "F", "UX Designer", 3, "6+ ans", 680],
+["ADUI1", "F", "UI Designer", 1, "0 - 2 ans", 455],
+["ADUI2", "F", "UI Designer", 2, "3 - 5 ans", 530],
+["ADUI3", "F", "UI Designer", 3, "6+ ans", 650],
+["ADCA1", "F", "Agile Coach", 1, "0 - 2 ans", 680],
+["ADCA2", "F", "Agile Coach", 2, "3 - 5 ans", 775],
+["ADCA3", "F", "Agile Coach", 3, "6+ ans", 895],
+["ADIO1", "F", "Ops Engineer", 1, "0 - 2 ans", 540],
+["ADIO2", "F", "Ops Engineer", 2, "3 - 5 ans", 675],
+["ADIO3", "F", "Ops Engineer", 3, "6 - 8 ans", 750],
+["ADIO4", "F", "Ops Engineer", 4, "9+ ans", 865],
+["ADSM1", "F", "Scrum Master", 1, "0 - 2 ans", 560],
+["ADSM2", "F", "Scrum Master", 2, "3 - 5 ans", 685],
+["ADSM3", "F", "Scrum Master", 3, "6+ ans", 750],
+["ADPO1", "F", "Proxy Product Owner", 1, "2+ ans", 750],
+["ADCD1", "F", "DevOps Coach", 1, "1+ an", 820],
+["ADCC1", "F", "Craftsmanship Coach", 1, "1+ an", 815],
+["ADID1", "F", "DevOps Engineer", 1, "0 - 2 ans", 680],
+["ADID2", "F", "DevOps Engineer", 2, "3 - 5 ans", 775],
+["ADID3", "F", "DevOps Engineer", 3, "6+ ans", 845],
+["ADLD1", "F", "Lead DevOps", 1, "5 - 10 ans", 885],
+["ADSL1", "F", "Servant Leader", 1, "6+ ans", 760],
+["ADIS1", "F", "Solution Engineer", 1, "0 - 2 ans", 560],
+["ADIS2", "F", "Solution Engineer", 2, "3 - 5 ans", 650],
+["ADIS3", "F", "Solution Engineer", 3, "6+ ans", 740],
+["AUDA1", "G", "Automation Developer", 1, "0 - 2 ans", 570],
+["AUDA2", "G", "Automation Developer", 2, "3 - 5 ans", 660],
+["AUDA3", "G", "Automation Developer", 3, "6+ ans", 790],
+["AUBA1", "G", "Automation Business Analyst", 1, "0 - 2 ans", 590],
+["AUBA2", "G", "Automation Business Analyst", 2, "3 - 5 ans", 690],
+["AUBA3", "G", "Automation Business Analyst", 3, "6+ ans", 920],
+["AUBA1", "G", "AI Business Analyst", 1, "0 - 2 ans", 630],
+["AUBA2", "G", "AI Business Analyst", 2, "3 - 5 ans", 730],
+["AULA1", "G", "Lead Automation Engineer", 1, "6+ ans", 760],
+["AUDE1", "G", "AI Designer", 1, "0 - 2 ans", 580],
+["AUDE2", "G", "AI Designer", 2, "3 - 5 ans", 780],
+["AUDE3", "G", "AI Designer", 3, "6+ ans", 980],
+["AUML1", "G", "ML Engineer", 1, "0 - 2 ans", 580],
+["AUML2", "G", "ML Engineer", 2, "3+ ans", 750],
+["AUAI1", "G", "AI Architect", 1, "3 - 5 ans", 850],
+["AUAI2", "G", "AI Architect", 2, "6+ ans", 1050],
+["AUDI1", "G", "AI DevOps Engineer", 1, "0 - 2 ans", 680],
+["AUDI2", "G", "AI DevOps Engineer", 2, "3 - 5 ans", 775],
+["AUDI3", "G", "AI DevOps Engineer", 3, "6+ ans", 845],
+["AUMO1", "G", "Machine Learning Ops", 1, "0 - 2 ans", 685],
+["AUMO2", "G", "Machine Learning Ops", 2, "3 - 5 ans", 780],
+["AUMO3", "G", "Machine Learning Ops", 3, "6+ ans", 850],
+["AUDS1", "G", "AI Data Scientist", 1, "0 - 2 ans", 555],
+["AUDS2", "G", "AI Data Scientist", 2, "3 - 5 ans", 715],
+["AUDS3", "G", "AI Data Scientist", 3, "6+ ans", 870],
+["AUCD1", "G", "Chief AI Data Scientist", 1, "3 - 5 ans", 835],
+["AUCD2", "G", "Chief AI Data Scientist", 2, "6+ ans", 985],
+["CLDN1", "H", "Cloud-Native Developer", 1, "0 - 2 ans", 525],
+["CLDN2", "H", "Cloud-Native Developer", 2, "3 - 5 ans", 610],
+["CLDN3", "H", "Cloud-Native Developer", 3, "6+ ans", 745],
+["CLDM1", "H", "Cloud Migration Developer", 1, "0 - 2 ans", 525],
+["CLDM2", "H", "Cloud Migration Developer", 2, "3 - 5 ans", 615],
+["CLDM3", "H", "Cloud Migration Developer", 3, "6+ ans", 755],
+["CLAC1", "H", "Cloud Architect", 1, "0 - 2 ans", 670],
+["CLAC2", "H", "Cloud Architect", 2, "3 - 5 ans", 875],
+["CLAC3", "H", "Cloud Architect", 3, "6+ ans", 1000],
+["CLEC1", "H", "Cloud Expert", 1, "5+ ans", 950],
+["CLFI1", "H", "FinOps Engineer", 1, "0 - 2 ans", 590],
+["CLFI2", "H", "FinOps Engineer", 2, "3 - 5 ans", 695],
+["CLFI3", "H", "FinOps Engineer", 3, "6+ ans", 810],
+["CLSR1", "H", "Site Reliability Engineer (SRE)", 1, "0 - 2 ans", 555],
+["CLSR2", "H", "Site Reliability Engineer (SRE)", 2, "3 - 5 ans", 655],
+["CLSR3", "H", "Site Reliability Engineer (SRE)", 3, "6+ ans", 765],
+["CLSE1", "H", "Cloud Security Expert", 1, "5+ ans", 1120],
+["ITWA1", "I", "Web/Mobile Tester", 1, "0 - 2 ans", 365],
+["ITWA2", "I", "Web/Mobile Tester", 2, "3 - 5 ans", 460],
+["ITWA3", "I", "Web/Mobile Tester", 3, "6+ ans", 540],
+["ITAU1", "I", "Test Automation Engineer", 1, "0 - 2 ans", 490],
+["ITAU2", "I", "Test Automation Engineer", 2, "3 - 5 ans", 580],
+["ITAU3", "I", "Test Automation Engineer", 3, "6+ ans", 670],
+["IDIA1", "I", "iOS/Android Developer", 1, "0 - 2 ans", 410],
+["IDIA2", "I", "iOS/Android Developer", 2, "3 - 5 ans", 550],
+["IDIA3", "I", "iOS/Android Developer", 3, "6+ ans", 695],
+["IDIA4", "I", "Front-end Developer", 1, "0 - 2 ans", 410],
+["IDIA5", "I", "Front-end Developer", 2, "3 - 5 ans", 550],
+["IDIA6", "I", "Front-end Developer", 3, "6+ ans", 690],
+["IDFS1", "I", "Full Stack JavaScript Developer", 1, "0 - 2 ans", 420],
+["IDFS2", "I", "Full Stack JavaScript Developer", 2, "3 - 5 ans", 570],
+["IDFS3", "I", "Full Stack JavaScript Developer", 3, "6+ ans", 700],
+["IDPH1", "I", "PHP Developer", 1, "0 - 2 ans", 410],
+["IDPH2", "I", "PHP Developer", 2, "3 - 5 ans", 550],
+["IDPH3", "I", "PHP Developer", 3, "6+ ans", 690],
+["ITLF1", "I", "Front-end Tech Lead", 1, "2 - 5 ans", 570],
+["ITLF2", "I", "Front-end Tech Lead", 2, "6 - 10 ans", 680],
+["ITLF3", "I", "Front-end Tech Lead", 3, "11+ ans", 760],
+["ITLM1", "I", "Mobile Tech Lead / Project Manager", 1, "3 - 5 ans", 580],
+["ITLM2", "I", "Mobile Tech Lead / Project Manager", 2, "6 - 10 ans", 690],
+["ITLM3", "I", "Mobile Tech Lead / Project Manager", 3, "11+ ans", 770],
+["IDAE1", "I", "AEM Developer", 1, "0 - 2 ans", 445],
+["IDAE2", "I", "AEM Developer", 2, "3 - 5 ans", 575],
+["IDAE3", "I", "AEM Developer", 3, "6+ ans", 740],
+["IEAE1", "I", "AEM Expert", 1, "3 - 5 ans", 640],
+["IEAE2", "I", "AEM Expert", 2, "6 - 10 ans", 790]
 ];
 const FW_BY_CODE = Object.fromEntries(FRAMEWORK_2026.map(r=>[r[0],{code:r[0],seg:r[1],profil:r[2],niv:r[3],exp:r[4],tjmMax:r[5]}]));
 function fwInfo(code){ return FW_BY_CODE[(code||"").toUpperCase().trim()] || null; }
-function fwLabel(code){ const f=fwInfo(code); return f ? f.profil+" N"+f.niv+" ("+f.exp+") — TJM max "+f.tjmMax+"\u20ac IDF / "+Math.round(f.tjmMax*0.85)+"\u20ac hors IDF\u00b7remote" : ""; }
-function fwDatalistHtml(){ return '<datalist id="fw-codes">'+FRAMEWORK_2026.map(r=>'<option value="'+r[0]+'">'+escHtml(r[2])+' N'+r[3]+' \u00b7 Seg '+r[1]+' \u00b7 '+r[5]+'\u20ac</option>').join("")+'</datalist>'; }
+function fwLabel(code){ const f=fwInfo(code); return f ? f.profil+" N"+f.niv+" ("+f.exp+") — TJM max "+f.tjmMax+"€ IDF / "+Math.round(f.tjmMax*0.85)+"€ hors IDF·remote" : ""; }
+function fwDatalistHtml(){ return '<datalist id="fw-codes">'+FRAMEWORK_2026.map(r=>'<option value="'+r[0]+'">'+escHtml(r[2])+' N'+r[3]+' · Seg '+r[1]+' · '+r[5]+'€</option>').join("")+'</datalist>'; }
 // ── Extrapolation du code framework depuis l'intitulé de profil PWise ──
 // Règles fr/en sur intitulé normalisé (minuscules, sans accents), du plus spécifique au plus générique.
+// Chaque règle : [regex, prefixe] ou [regex, prefixe, offsetNiveau] (offset ajouté au niveau détecté).
 const FW_RULES = [
+  // ── Segments D/F/G/H/I (grille 2026 étendue) — placés avant les règles A/B/C/E ──
+  // Garde sécurité : "Data Analyst sécurité" (seg E) doit rester SECDAA, pas Data (seg D).
+  [/data analyst.*securit|securit.*data analyst/, "SECDAA"],
+  // Segment D — Data
+  [/chief (ai )?data scientist/, "AUCD"],
+  [/lead data scientist/, "DLDS"],
+  [/data scientist ia|ai data scientist/, "AUDS"],
+  [/data scientists?/, "DDDS"],
+  [/data engineer/, "DDDE"],
+  [/data architect|data architecte/, "DDAR"],
+  [/data steward/, "DDDW"],
+  [/data security officer/, "DDSO"],
+  [/data service/, "DDSE"],
+  [/data analyst/, "DDDA"],
+  [/referent technique|technical referent/, "DDRT"],
+  // Segment F — Agile / DevOps
+  [/ux designer|designer ux/, "ADUX"],
+  [/ui designer|designer ui/, "ADUI"],
+  [/coach agile|agile coach/, "ADCA"],
+  [/coach devops|devops coach/, "ADCD"],
+  [/coach craft|craftsmanship coach/, "ADCC"],
+  [/scrum master/, "ADSM"],
+  [/proxi?y? product owner|product owner/, "ADPO"],
+  [/lead ?devops|lead dev ?ops/, "ADLD"],
+  [/servant leader/, "ADSL"],
+  [/ingenieur devops|devops engineer/, "ADID"],
+  [/ingenieur solution|solution engineer/, "ADIS"],
+  [/ingenieur ops|ops engineer/, "ADIO"],
+  // Segment G — Automation & AI
+  [/lead (engineer )?automation|lead automation engineer/, "AULA"],
+  [/developpeur automation|automation developer/, "AUDA"],
+  [/business analyst (automation|ia)|automation business analyst|ai business analyst/, "AUBA"],
+  [/design ia|ai designer/, "AUDE"],
+  [/machine learning ops|ml ?ops|mlops/, "AUMO"],
+  [/ml engineer|machine learning engineer/, "AUML"],
+  [/architecte ia|ai architect/, "AUAI"],
+  [/devops ia|ai devops/, "AUDI"],
+  // Segment H — Cloud
+  [/developpeur cloud[- ]?natif|cloud[- ]?native developer/, "CLDN"],
+  [/developpeur cloud migration|cloud migration developer/, "CLDM"],
+  [/architecte cloud|cloud architect/, "CLAC"],
+  [/cloud security expert/, "CLSE"],
+  [/expert cloud|cloud expert/, "CLEC"],
+  [/finops/, "CLFI"],
+  [/\bsre\b|site reliability/, "CLSR"],
+  // Segment I — Web / Mobile
+  [/testeur web ?mobile|web ?\/? ?mobile tester/, "ITWA"],
+  [/test automaticien|test automation/, "ITAU"],
+  [/tech lead front|front[- ]?end tech lead/, "ITLF"],
+  [/tech lead mobile|mobile tech lead/, "ITLM"],
+  [/expert aem/, "IEAE"],
+  [/developpeur aem|aem developer/, "IDAE"],
+  [/full ?stack (javascript|js)|developpeur full ?stack/, "IDFS"],
+  [/developpeur php|php developer/, "IDPH"],
+  [/developpeur front[- ]?end|front[- ]?end developer/, "IDIA"],
+  [/developpeur ios|ios ?\/? ?android|android developer/, "IDIA"],
+  // ── Segments A/B/C/E (grille initiale) ──
   [/project manager risques it|it risk & cybersecurity project manager/, "SECPM"],
   [/it risks? expert|it risques expert/, "SECREX"],
   [/it risques business analyst|security risk & compliance/, "SECRBA"],
@@ -444,30 +613,27 @@ function fwSuggest(profil){
   const m=p.match(/(?:niveau|level)\s*(\d)/);
   if(!m) return "";
   const niv=parseInt(m[1]);
-  let prefix="";
-  for(const [re,pre] of FW_RULES){ if(re.test(p)){ prefix=pre; break; } }
+  let prefix="", offset=0;
+  for(const r of FW_RULES){ if(r[0].test(p)){ prefix=r[1]; offset=r[2]||0; break; } }
   if(!prefix) return "";
+  const target=niv+offset;
   const lvls=FRAMEWORK_2026.filter(r=>r[0].replace(/[0-9]+$/,"")===prefix).map(r=>r[3]).sort((a,b)=>a-b);
   if(!lvls.length) return "";
-  const best=lvls.includes(niv)?niv:(lvls.filter(l=>l<=niv).pop() ?? lvls[0]);
+  const best=lvls.includes(target)?target:(lvls.filter(l=>l<=target).pop() ?? lvls[0]);
   return prefix+best;
 }
 // Code effectif : saisie manuelle prioritaire, sinon extrapolation.
 function fwEffective(a){ return a.codeFramework || fwSuggest(a.profil); }
-
 // ===================== BASE DE DONNÉES =====================
 let memoryStore = { aos: [], imports: [] };
 const useSupabase = SUPABASE_URL && SUPABASE_KEY;
-
 function sbHeaders(extra) {
   return { "apikey": SUPABASE_KEY, "Authorization": "Bearer "+SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal", ...extra };
 }
-
 async function openDB() {
   if(useSupabase) { console.log("Supabase connecté: "+SUPABASE_URL); return; }
   console.warn("Supabase non configuré — mode mémoire (données non persistées)");
 }
-
 async function dbGetAll(store) {
   if(!useSupabase) return store==="aos"?memoryStore.aos:memoryStore.imports;
   try {
@@ -478,7 +644,6 @@ async function dbGetAll(store) {
     return rows.map(r=>r.data);
   } catch(e) { console.error("Supabase GET error:", e); return store==="aos"?memoryStore.aos:memoryStore.imports; }
 }
-
 async function dbPut(store, data) {
   if(store==="aos"){const i=memoryStore.aos.findIndex(a=>a.rfc===data.rfc);if(i>=0)memoryStore.aos[i]=data;else memoryStore.aos.push(data);}
   else memoryStore.imports.push(data);
@@ -497,7 +662,6 @@ async function dbPut(store, data) {
     return false;
   }
 }
-
 async function dbPutMany(store, items) {
   if(store==="aos") items.forEach(item=>{const i=memoryStore.aos.findIndex(a=>a.rfc===item.rfc);if(i>=0)memoryStore.aos[i]=item;else memoryStore.aos.push(item);});
   else memoryStore.imports.push(...items);
@@ -518,7 +682,6 @@ async function dbPutMany(store, items) {
     return false;
   }
 }
-
 async function dbDelete(rfc) {
   // Memory
   memoryStore.aos = memoryStore.aos.filter(a => a.rfc !== rfc);
@@ -536,7 +699,6 @@ async function dbDelete(rfc) {
     return false;
   }
 }
-
 // ===================== PARSER =====================
 function parseAOs(raw) {
   const lines = raw.split("\n").map(l => l.trim()).filter(Boolean);
@@ -574,7 +736,6 @@ function parseAOs(raw) {
   }
   return aos;
 }
-
 // ===================== HELPERS =====================
 function categorize(p) {
   const l=(p||"").toLowerCase();
@@ -585,14 +746,12 @@ function categorize(p) {
   return "Autre";
 }
 const CAT_COLORS={Dev:"#3b82f6",BA:"#8b5cf6",CdP:"#f59e0b",Expert:"#ef4444",Autre:"#6b7280"};
-
 function parseDate(d){if(!d)return null;const p=d.split("/");if(p.length===3)return new Date(p[2],p[1]-1,p[0]);return new Date(d);}
 function toISO(d){if(!d)return"";const dt=parseDate(d);if(!dt||isNaN(dt))return"";return dt.toISOString().slice(0,10);}
 function fromISO(s){if(!s)return"";const[y,m,d]=s.split("-");return`${d}/${m}/${y}`;}
 function urgency(d){const dt=parseDate(d);if(!dt)return 0;const diff=(dt-new Date())/86400000;if(diff<0)return 3;if(diff<=7)return 2;if(diff<=21)return 1;return 0;}
 function shortOrg(o){return(o||"").replace(/BCEF (IT|RETAIL) - /g,"").replace(/\d+\s*/g,"").trim().substring(0,28);}
 function domainGroup(o){const s=(o||"").replace(/^BCEF (IT|RETAIL) - /,"").trim();const m=s.match(/^([A-Z0-9]{2,})/);return m?m[1]:s.split(" ")[0]||"Autre";}
-
 function statutSuivi(ao) {
   if(ao.dateDemarrage) return "demarrage";
   if(ao.dateQualif) return "qualif";
@@ -622,13 +781,10 @@ function statutPill(s, ao) {
     ? ' <span class="status-pill pill-flag-repondu" title="Réponse déjà transmise sur cet AO">✓ déjà répondu</span>' : '';
   return '<span class="status-pill '+cls+'">'+statutLabel(s)+'</span>'+flag;
 }
-
 function today(){return new Date().toISOString().slice(0,10);}
-
 // Échappement HTML — les données PWise (profil, intitulé, org, notes) peuvent
 // contenir guillemets / chevrons et casser le rendu ou les attributs title.
 function escHtml(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-
 // Toast non bloquant — confirmation de sauvegarde et erreurs base.
 function toast(msg, type="ok"){
   let zone=document.getElementById("toast-zone");
@@ -639,7 +795,6 @@ function toast(msg, type="ok"){
   zone.appendChild(t);
   setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),350);}, type==="err"?6000:2200);
 }
-
 function periodKey(dateStr, mode) {
   const d = dateStr ? (dateStr.includes("/") ? parseDate(dateStr) : new Date(dateStr)) : null;
   if(!d || isNaN(d)) return null;
@@ -655,7 +810,6 @@ function periodKey(dateStr, mode) {
   if(mode==="year") return ""+y;
   return y+"-"+String(m+1).padStart(2,"0");
 }
-
 function periodLabel(key, mode) {
   if(!key) return "—";
   if(mode==="week") { const [y,w]=key.split("-S"); return "Sem. "+parseInt(w)+" "+y; }
@@ -664,7 +818,6 @@ function periodLabel(key, mode) {
   if(mode==="semester") return key.replace("-S"," Sem. ");
   return key;
 }
-
 function periodFilter(dateStr, period) {
   if(!period||period==="all") return true;
   const d = parseDate(dateStr);
@@ -676,22 +829,18 @@ function periodFilter(dateStr, period) {
   if(period==="year") { const y=new Date(now); y.setFullYear(y.getFullYear()-1); return d>=y; }
   return true;
 }
-
 // ===================== STATE =====================
 let allAOs = [];
 let histAOs = [];
 let currentView = "dashboard";
-
 // ── Gestion utilisateur courant (Phase 1 traçabilité) ──
 const USER_KEY = 'intm_trigramme';
 let currentUser = localStorage.getItem(USER_KEY) || "";
-
 function setCurrentUser(tri) {
   currentUser = tri.toUpperCase().trim().substring(0, 4);
   localStorage.setItem(USER_KEY, currentUser);
   renderUserBadge();
 }
-
 function renderUserBadge() {
   const badge = document.getElementById("user-badge");
   if (!badge) return;
@@ -701,12 +850,10 @@ function renderUserBadge() {
     badge.innerHTML = `<button onclick="promptUser()" style="background:var(--green);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-weight:600">⚠️ Définir mon trigramme</button>`;
   }
 }
-
 function promptUser() {
   const tri = prompt("Votre trigramme (ex: VBE, FIB) :", currentUser);
   if (tri !== null) setCurrentUser(tri);
 }
-
 // Stamp : ajoute traçabilité à un AO avant sauvegarde
 function stampAO(ao, action = "modifié") {
   if (!currentUser) return ao;
@@ -717,7 +864,6 @@ function stampAO(ao, action = "modifié") {
 let filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
 let sort = { col:"dateDebut", dir:1 };
 let selectedRFC = null;
-
 // Chargement avec exclusion des domaines non gérés + AO historiques séparés
 async function loadAOs() {
   const all = await dbGetAll("aos");
@@ -725,17 +871,13 @@ async function loadAOs() {
     .filter(a => !EXCLUDED_DOMAINS.includes(domainGroup(a.org)))
     .filter(a => !a.isHistorique);
 }
-
 async function loadHistoricalAOs() {
   // Historique global = tous les AOs (actifs + historiques, tous périmètres)
   histAOs = await dbGetAll("aos");
 }
-
 function getOpenAOs() { return allAOs.filter(a => a.statut !== "clos"); }
-
 // Date de début du dashboard (encours actif depuis début avril)
 let dashDateFrom = "2026-04-01";
-
 function normDate(d) {
   if(!d) return "";
   // Convertir DD/MM/YYYY → YYYY-MM-DD pour comparaison
@@ -772,7 +914,6 @@ function getFilteredAOs() {
   });
   return f;
 }
-
 // ===================== NAVIGATION =====================
 function navigate(view) {
   currentView = view;
@@ -781,7 +922,6 @@ function navigate(view) {
   document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.view===view));
   renderView();
 }
-
 async function renderView() {
   try {
     await loadAOs();
@@ -796,10 +936,8 @@ async function renderView() {
     document.getElementById("main-content").innerHTML='<div style="padding:40px;color:red;font-size:14px"><h2>Erreur rendu ('+currentView+')</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
   }
 }
-
 // ===================== DASHBOARD =====================
 let dashF = { dept:null, domain:null, bm:null, cat:null, suivi:null, periodView:"month" };
-
 function dashFilteredAOs() {
   let f = (dashF.suivi==="tous_clos"||dashF.suivi==="clos_nt"||dashF.suivi==="clos_t") ? [...getDashAOs()] : getDashOpenAOs();
   if(dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
@@ -818,9 +956,7 @@ function dashFilteredAOs() {
   }
   return f;
 }
-
 function dashHasFilters(){ return dashF.dept||dashF.domain||dashF.bm||dashF.cat||dashF.suivi; }
-
 function renderDashboard(el) {
   const all = getDashOpenAOs();
   const filtered = dashFilteredAOs();
@@ -830,7 +966,6 @@ function renderDashboard(el) {
   const demarrage=filtered.filter(a=>statutSuivi(a)==="demarrage").length;
   const nonTraite=filtered.filter(a=>statutSuivi(a)==="ouvert").length;
   const urgent=filtered.filter(a=>urgency(a.dateDebut)>=2).length;
-
   function subFilter(exclude) {
     let f=getDashOpenAOs();
     if(exclude!=="dept" && dashF.dept) f=f.filter(a=>a.dept===dashF.dept);
@@ -847,12 +982,10 @@ function renderDashboard(el) {
     }
     return f;
   }
-
   const deptData = subFilter("dept");
   const byDept={}; deptData.forEach(a=>{byDept[a.dept]=(byDept[a.dept]||0)+1;});
   const deptEntries=Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
   const maxDept=deptEntries.length?deptEntries[0][1]:1;
-
   let domainEntries=[], maxDomain=1;
   if(dashF.dept) {
     const domData=subFilter("domain").filter(a=>a.dept===dashF.dept);
@@ -860,15 +993,12 @@ function renderDashboard(el) {
     domainEntries=Object.entries(byDom).sort((a,b)=>b[1]-a[1]);
     maxDomain=domainEntries.length?domainEntries[0][1]:1;
   }
-
   const bmData=subFilter("bm");
   const byBM={}; bmData.forEach(a=>{const bm=a.bm||"Non assigné";byBM[bm]=(byBM[bm]||0)+1;});
   const bmEntries=Object.entries(byBM).sort((a,b)=>b[1]-a[1]);
   const maxBM=bmEntries.length?bmEntries[0][1]:1;
-
   const catData=subFilter("cat");
   const byCat={}; catData.forEach(a=>{const c=categorize(a.profil);byCat[c]=(byCat[c]||0)+1;});
-
   const fClosNT=getDashAOs().filter(a=>{
     if(a.statut!=="clos"||hasTraitement(a)) return false;
     if(dashF.dept&&a.dept!==dashF.dept) return false;
@@ -891,7 +1021,6 @@ function renderDashboard(el) {
   const fAttenteRep=filtered.filter(a=>a.bm&&!a.dateReponse).length;
   const fNonAttrib=filtered.filter(a=>!a.bm).length;
   const totalRecu=fClosNT+fClosT+total;
-
   const fSteps=[
     {label:"Total reçu",n:totalRecu,color:"#475569",key:null,bold:true},
     {label:"Clos sans trait.",n:fClosNT,color:"#94a3b8",key:"clos_nt",indent:true},
@@ -919,7 +1048,6 @@ function renderDashboard(el) {
   });
   funnelHtml+='</div>';
   if(totalRecu) funnelHtml+='<div style="margin-top:8px;font-size:11px;color:var(--gray);text-align:center">Taux conversion : <strong style="color:'+(fDem/totalRecu>=0.1?"var(--green)":"var(--amber)")+'">'+Math.round(fDem/totalRecu*100)+'%</strong> (reçu → démarré)</div>';
-
   const mgrData={};
   const mgrSource = getDashAOs().filter(a=>{
     if(dashF.dept && a.dept!==dashF.dept) return false;
@@ -974,7 +1102,6 @@ function renderDashboard(el) {
     });
     mgrHtml+='</tbody></table>';
   }
-
   let deptChartHtml='';
   if(dashF.dept){
     domainEntries.forEach(([d,n])=>{
@@ -992,7 +1119,6 @@ function renderDashboard(el) {
       deptChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxDept*100)+'%;background:var(--green)">'+n+'</div></div></div>';
     });
   }
-
   let bmChartHtml='';
   bmEntries.forEach(([bm,n])=>{
     const sel=dashF.bm===bm;
@@ -1000,20 +1126,17 @@ function renderDashboard(el) {
     bmChartHtml+='<div class="bar-label">'+bm+'</div>';
     bmChartHtml+='<div class="bar-track"><div class="bar-fill" style="width:'+Math.round(n/maxBM*100)+'%;background:'+(sel?"var(--green)":"var(--blue)")+'">'+n+'</div></div></div>';
   });
-
   let catHtml='';
   Object.entries(byCat).forEach(([c,n])=>{
     const sel=dashF.cat===c;
     catHtml+='<span class="badge dash-click" data-key="cat" data-val="'+c+'" style="background:'+CAT_COLORS[c]+';font-size:12px;padding:6px 14px;cursor:pointer;'+(sel?"outline:2px solid #333;outline-offset:2px;":"")+'">'+c+': '+n+'</span> ';
   });
-
   const tags=[];
   if(dashF.dept) tags.push({k:"dept",v:dashF.dept});
   if(dashF.domain) tags.push({k:"domain",v:dashF.domain});
   if(dashF.bm) tags.push({k:"bm",v:dashF.bm});
   if(dashF.cat) tags.push({k:"cat",v:dashF.cat});
   if(dashF.suivi) tags.push({k:"suivi",v:{tous_clos:"Total reçu",clos_nt:"Clos sans trait.",clos_t:"Clos traités",ouvert:"Non attribués",encours:"En attente rép.",repondu:"Répondus",qualif:"Qualifiés",demarrage:"Démarrés"}[dashF.suivi]||dashF.suivi});
-
   let tagsHtml='';
   if(tags.length){
     tagsHtml='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">';
@@ -1022,7 +1145,6 @@ function renderDashboard(el) {
     });
     tagsHtml+='</div>';
   }
-
   const pMode=dashF.periodView||"month";
   const periodBuckets={};
   const periodByBM={};
@@ -1092,7 +1214,6 @@ function renderDashboard(el) {
   } else {
     periodHtml+='<div style="color:var(--gray);font-size:13px;text-align:center;padding:16px">Aucune donnée pour cette période</div>';
   }
-
   // ── Résultats & pertes ──
   // Source : AOs du dashboard filtrés (respect dashDateFrom + filtres actifs dept/domain/bm/cat)
   const srcDash = getDashAOs().filter(a => {
@@ -1107,10 +1228,8 @@ function renderDashboard(el) {
   const soumisEnAttente  = srcDash.filter(a => aReponduAO(a) && !estRetenuAO(a) && !estNonRetenuAO(a));
   const partisNonSoumis  = srcDash.filter(a => !aReponduAO(a) && a.statut === 'clos');
   const ouvertsNonSoumis = srcDash.filter(a => !aReponduAO(a) && a.statut !== 'clos');
-
   const totalSoumis = soumisRetenus.length + soumisNonRetenus.length + soumisEnAttente.length;
   const winRate = totalSoumis ? Math.round(soumisRetenus.length / totalSoumis * 100) : 0;
-
   const mkRow = (emoji, label, items, color, key) => {
     const n = items.length;
     if(!n) return '';
@@ -1129,7 +1248,6 @@ function renderDashboard(el) {
       <div style="font-size:28px;font-weight:800;color:${color};min-width:36px;text-align:right">${n}</div>
     </div>`;
   };
-
   const resultatsHtml = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
       <div>
@@ -1151,7 +1269,6 @@ function renderDashboard(el) {
         </div>`:'<div style="margin-top:8px;padding:8px;background:#d1fae5;border-radius:6px;font-size:11px;color:#065f46">✅ Aucun AO parti sans soumission !</div>'}
       </div>
     </div>`;
-
   el.innerHTML = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">'
     +'<h1 style="font-size:24px;font-weight:800">Dashboard</h1>'
     +'<div style="display:flex;align-items:center;gap:8px;margin-left:auto">'
@@ -1183,7 +1300,6 @@ function renderDashboard(el) {
     +'<div class="card"><div class="card-title">📅 Activité par période</div>'+periodHtml+'</div>'
     +'<div class="card" style="border-left:4px solid var(--amber)"><div class="card-title">🎯 Résultats & pertes <span style="font-size:11px;color:var(--text-light);font-weight:400">— tous AOs avec suivi · cliquez pour voir la liste</span></div>'+resultatsHtml+'</div>'
     +(dashHasFilters()?'<div style="text-align:center;margin-top:16px"><button class="btn btn-green" id="dash-to-list" style="padding:10px 24px;font-size:14px">📋 Voir la liste des '+total+' AO filtrés</button></div>':"");
-
   document.querySelectorAll(".dash-click").forEach(el=>{
     el.addEventListener("click",()=>{
       const k=el.dataset.key, v=el.dataset.val;
@@ -1193,7 +1309,6 @@ function renderDashboard(el) {
       renderDashboard(document.getElementById("main-content"));
     });
   });
-
   document.querySelectorAll(".dash-tag").forEach(el=>{
     el.addEventListener("click",()=>{
       const k=el.dataset.key;
@@ -1202,13 +1317,10 @@ function renderDashboard(el) {
       renderDashboard(document.getElementById("main-content"));
     });
   });
-
   const clearBtn=document.getElementById("dash-clear");
   if(clearBtn) clearBtn.addEventListener("click",()=>{ dashF={dept:null,domain:null,bm:null,cat:null,suivi:null,periodView:dashF.periodView||"month"}; renderDashboard(document.getElementById("main-content")); });
-
   const dateFromInput=document.getElementById("dash-date-from");
   if(dateFromInput) dateFromInput.addEventListener("change",e=>{ dashDateFrom=e.target.value; renderDashboard(document.getElementById("main-content")); });
-
   const listBtn=document.getElementById("dash-to-list");
   if(listBtn) listBtn.addEventListener("click",()=>{
     filters.dept=dashF.dept||"Tous";
@@ -1219,7 +1331,6 @@ function renderDashboard(el) {
     if(dashF.domain) filters.search=dashF.domain;
     navigate("liste");
   });
-
   const closKpi=document.getElementById("kpi-clos");
   if(closKpi) closKpi.addEventListener("click",()=>{
     filters.statut="clos_nontraite";
@@ -1232,7 +1343,6 @@ function renderDashboard(el) {
     filters.dept="Tous"; filters.cat="Tous"; filters.bm="Tous"; filters.search="";
     navigate("liste");
   });
-
   // ── Résultats & pertes — clics vers liste filtrée ──
   const resMap = {
     retenus:        a => aReponduAO(a) && estRetenuAO(a),
@@ -1288,14 +1398,12 @@ function renderDashboard(el) {
       panel.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });
-
   document.querySelectorAll(".period-btn").forEach(btn=>{
     btn.addEventListener("click",()=>{
       dashF.periodView=btn.dataset.period;
       renderDashboard(document.getElementById("main-content"));
     });
   });
-
   document.querySelectorAll(".period-row").forEach(row=>{
     row.addEventListener("click",()=>{
       const pk=row.dataset.pk;
@@ -1340,16 +1448,13 @@ function renderDashboard(el) {
     });
   });
 }
-
 // ===================== LISTE AO =====================
 function renderListe(el) {
   const open = getOpenAOs();
   const depts = ["Tous",...new Set(allAOs.map(a=>a.dept))];
   const cats = ["Tous",...new Set(allAOs.map(a=>categorize(a.profil)))];
   const bms = ["Tous",...new Set(allAOs.map(a=>a.bm||"—").filter(Boolean))];
-
   const filtered = getFilteredAOs();
-
   let tableRows = filtered.map(a=>{
     const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
     const isClos=a.statut==="clos";
@@ -1373,16 +1478,13 @@ function renderListe(el) {
       </td>
     </tr>`;
   }).join("");
-
   if(!filtered.length){
     tableRows = `<tr><td colspan="12" style="padding:36px;text-align:center;color:var(--gray);font-size:13px">
       Aucun appel d'offres ne correspond aux filtres actifs.<br>
       <button class="btn" id="reset-filters" style="margin-top:12px">Réinitialiser les filtres</button>
     </td></tr>`;
   }
-
   const sortArrow = c => sort.col===c ? (sort.dir===1?" ▲":" ▼") : "";
-
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
     <div class="filter-bar">
@@ -1422,7 +1524,6 @@ function renderListe(el) {
     </div>
     <div id="detail-area"></div>
   `;
-
   // Recherche : debounce + restauration du focus (le re-render détruisait le champ à chaque frappe)
   let searchTimer=null;
   document.getElementById("f_search").addEventListener("input",e=>{
@@ -1457,10 +1558,8 @@ function renderListe(el) {
     tr.addEventListener("click",openRow);
     tr.addEventListener("keydown",e=>{ if(e.key==="Enter") openRow(); });
   });
-
   if(selectedRFC) renderDetail(document.getElementById("detail-area"), selectedRFC);
 }
-
 function renderDetail(el, rfc) {
   const ao = allAOs.find(a=>a.rfc===rfc) || histAOs.find(a=>a.rfc===rfc);
   if(!ao) return;
@@ -2223,7 +2322,6 @@ function formatSyncResult(c, label, date = "") {
   </div>`;
 }
 // ── (S) Rendu UI — séparé de la logique métier ──
-// ── (S) Rendu UI — séparé de la logique métier ──
 function renderImport(el) {
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import PWise</h1>
@@ -2418,7 +2516,7 @@ async function doExportCSV(){
     const ss=statutComplet(a);
     csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${fwEffective(a)||""};${fwInfo(fwEffective(a))?.tjmMax??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
   });
-  download("ao_bcef_export.csv", "\uFEFF"+csv, "text/csv;charset=utf-8;");
+  download("ao_bcef_export.csv", "﻿"+csv, "text/csv;charset=utf-8;");
 }
 async function doExportJSON(){
   const aos=await getExportAOs();
