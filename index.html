@@ -173,9 +173,11 @@ button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus
       <h2>INTM</h2>
       <span>AO Manager</span>
     </div>
-    <div class="nav-item active" data-view="dashboard"><span class="icon">📊</span> Dashboard <span class="nav-badge" id="nav-count">0</span></div>
+    <div class="client-switch" style="padding:0 20px 14px">
+      <select id="client-select" style="width:100%;padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.12);font-size:12px"></select>
+    </div>
+    <div class="nav-item active" data-view="historique"><span class="icon">📊</span> <span id="nav-dash-label">Dashboard BNP</span> <span class="nav-badge" id="nav-count">0</span></div>
     <div class="nav-item" data-view="liste"><span class="icon">📋</span> Appels d'offres</div>
-    <div class="nav-item" data-view="historique"><span class="icon">📈</span> Historique</div>
     <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
     <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
     <div style="position:absolute;bottom:52px;left:0;right:0;padding:0 16px">
@@ -193,6 +195,17 @@ const SUPABASE_URL = "https://tjlrhacczpdtgtiutjlm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqbHJoYWNjenBkdGd0aXV0amxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzcxNTIsImV4cCI6MjA5MTI1MzE1Mn0.iBBvWvBtVHWf6s9eRb1cF9TgDqWBdl_8Bc3y6KH8lA4";
 // Domaines exclus (équipe non utilisatrice de l'outil)
 const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
+// ===================== CLIENTS (multi-clients) =====================
+// BNP = client historique. Chaque nouveau client = une entrée ici (active:true).
+const CLIENTS = [
+  { id:"BNP", label:"BNP Paribas", source:"PWise / OneProcTool", excluded:["IECC","DIFA","MDEP"], active:true },
+];
+const DEFAULT_CLIENT = "BNP";
+let selectedClient = DEFAULT_CLIENT;
+function clientOf(ao){ return ao.client || DEFAULT_CLIENT; }
+function clientMeta(id){ return CLIENTS.find(c => c.id === id) || CLIENTS[0]; }
+function activeClients(){ return CLIENTS.filter(c => c.active); }
+function clientAOs(list){ return (list||[]).filter(a => clientOf(a) === selectedClient); }
 // ===================== FRAMEWORK BNP × INTM 2026 =====================
 // Grille Schedule 12 — TJM max IDF (€ HT). Hors IDF / full remote = -15%.
 // Source : BNP_INTM_Framework_Segments_2026.xlsx — [code, segment, profil, niveau, expérience, tjmMaxIDF]
@@ -730,7 +743,7 @@ function parseAOs(raw) {
       }
       // Si pas de profil (format liste seul), utiliser l'intitulé comme fallback
       if(!profil && intitule) profil = intitule;
-      if(rfc)aos.push({rfc,tm,intitule,org,dept,statutPwise,profil,modalite,dateDebut,dateFin,nbJours});
+      if(rfc)aos.push({rfc,tm,intitule,org,dept,statutPwise,profil,modalite,dateDebut,dateFin,nbJours,client:"BNP"});
       i=j;
     } else i++;
   }
@@ -832,7 +845,7 @@ function periodFilter(dateStr, period) {
 // ===================== STATE =====================
 let allAOs = [];
 let histAOs = [];
-let currentView = "dashboard";
+let currentView = "historique";
 // ── Gestion utilisateur courant (Phase 1 traçabilité) ──
 const USER_KEY = 'intm_trigramme';
 let currentUser = localStorage.getItem(USER_KEY) || "";
@@ -1701,9 +1714,10 @@ function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage
 function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
 async function renderHistorique(el) {
   await loadHistoricalAOs();
-  if (!histAOs.length) {
+  const clientHist = clientAOs(histAOs);
+  if (!clientHist.length) {
     el.innerHTML = `
-      <h1 style="font-size:24px;font-weight:800;margin-bottom:16px">📈 Historique</h1>
+      <h1 style="font-size:24px;font-weight:800;margin-bottom:16px">📊 Dashboard ${selectedClient}</h1>
       <div class="card" style="text-align:center;padding:40px">
         <div style="font-size:48px;margin-bottom:16px">📭</div>
         <h3 style="margin-bottom:8px">Aucune donnée historique</h3>
@@ -1712,10 +1726,10 @@ async function renderHistorique(el) {
       </div>`;
     return;
   }
-  const depts = ["Tous", ...new Set(histAOs.map(a => a.dept).filter(Boolean))].sort();
-  const cats  = ["Tous", ...new Set(histAOs.map(a => categorize(a.profil)))];
+  const depts = ["Tous", ...new Set(clientHist.map(a => a.dept).filter(Boolean))].sort();
+  const cats  = ["Tous", ...new Set(clientHist.map(a => categorize(a.profil)))];
   // Filtrage
-  let f = [...histAOs];
+  let f = [...clientHist];
   if (histF.dept !== "Tous") f = f.filter(a => a.dept === histF.dept);
   if (histF.domain !== "Tous") f = f.filter(a => domainGroup(a.org) === histF.domain);
   if (histF.cat  !== "Tous") f = f.filter(a => categorize(a.profil) === histF.cat);
@@ -1918,7 +1932,7 @@ async function renderHistorique(el) {
   const hWinRate = hTotalSoumis ? Math.round(hRetenus.length / hTotalSoumis * 100) : 0;
   // ── Taux de réponse AO (depuis le 1er avril 2026, filtres actifs appliqués) ──
   const TAUX_REPONSE_DATE_FROM = "2026-04-01";
-  const aosSinceApril = histAOs.filter(a => {
+  const aosSinceApril = clientHist.filter(a => {
     if ((a.dateOuverture || a.dateCreation || "") < TAUX_REPONSE_DATE_FROM) return false;
     if (histF.dept   !== "Tous" && a.dept !== histF.dept) return false;
     if (histF.domain !== "Tous" && domainGroup(a.org) !== histF.domain) return false;
@@ -1972,8 +1986,8 @@ async function renderHistorique(el) {
     </div>`;
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-      <h1 style="font-size:24px;font-weight:800">📈 Historique Global</h1>
-      <span style="font-size:13px;color:var(--gray)">${histAOs.length} AO · tous périmètres</span>
+      <h1 style="font-size:24px;font-weight:800">📊 Dashboard ${selectedClient}</h1>
+      <span style="font-size:13px;color:var(--gray)">${clientHist.length} AO</span>
     </div>
     <div class="filter-bar" style="margin-bottom:8px">
       <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Tous départements":d}</option>`).join("")}</select>
@@ -2149,7 +2163,6 @@ async function renderHistorique(el) {
     document.querySelectorAll(".hist-ao-row").forEach(row => {
       row.addEventListener("click", () => {
         const rfc = row.dataset.rfc;
-        // Highlight selected row
         document.querySelectorAll(".hist-ao-row").forEach(r => r.style.outline = "");
         row.style.outline = "2px solid var(--blue)";
         row.style.outlineOffset = "-2px";
@@ -2176,7 +2189,6 @@ async function renderHistorique(el) {
       else histF[k] = v;
       if (k === "dept") histF.domain = "Tous";
       renderHistorique(el);
-      // Scroll + afficher liste après rendu
       setTimeout(() => {
         const panel = document.getElementById("hist-list-panel");
         if (panel) { showHistList(); }
@@ -2201,6 +2213,7 @@ async function renderHistorique(el) {
 // ===================== IMPORT =====================
 // ── (S) AO factory — construction d'un AO vierge ──
 const AO_DEFAULTS = {
+  client:"BNP",
   bm:"", consultant:"", tjm:"", notes:"",
   datePrise:"", dateReponse:"", dateQualif:"",
   dateDemarrage:"", dateCloture:"", dateDisparition:"", aRepondu:false
@@ -2316,8 +2329,7 @@ function formatSyncResult(c, label, date = "") {
     ${c.pending  ? `· ⏳ ${c.pending} en sursis`    : ""}
     ${c.unchanged ? `· ✔️ ${c.unchanged} inchangés` : ""}
     <br><span style="font-size:12px">→
-      <a href="#" onclick="navigate('dashboard');return false;" style="color:var(--green);font-weight:600">Dashboard</a> ·
-      <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Historique</a>
+      <a href="#" onclick="navigate('historique');return false;" style="color:var(--green);font-weight:600">Voir le Dashboard</a>
     </span>
   </div>`;
 }
@@ -2552,6 +2564,20 @@ async function seedIfEmpty(){
   await dbPut("imports", {date:today(), time:new Date().toLocaleTimeString("fr-FR"), nbParsed:parsed.length, added:toSave.length, updated:0, closed:0, unchanged:0});
   console.log("Seed: "+toSave.length+" AO importés ("+EXCLUDED_DOMAINS.join(",")+' exclus)');
 }
+// ===================== SÉLECTEUR CLIENT =====================
+function initClientSelect(){
+  const sel = document.getElementById("client-select");
+  if(!sel) return;
+  sel.innerHTML = activeClients().map(c => `<option value="${c.id}"${c.id===selectedClient?" selected":""}>${c.label}</option>`).join("");
+  const lbl = document.getElementById("nav-dash-label");
+  if(lbl) lbl.textContent = "Dashboard " + selectedClient;
+  sel.addEventListener("change", e => {
+    selectedClient = e.target.value;
+    const l = document.getElementById("nav-dash-label");
+    if(l) l.textContent = "Dashboard " + selectedClient;
+    renderView();
+  });
+}
 async function init(){
   try {
     // Échap ferme le panneau de détail ou le panneau résultats
@@ -2587,6 +2613,7 @@ async function init(){
     document.querySelectorAll(".nav-item").forEach(n=>{
       n.addEventListener("click",()=>{ closeMenu(); navigate(n.dataset.view); });
     });
+    initClientSelect();
     await renderView();
   } catch(e) {
     document.getElementById("main-content").innerHTML='<div style="padding:40px;color:red;font-size:14px"><h2>Erreur au chargement</h2><pre>'+e.message+'\n'+e.stack+'</pre></div>';
