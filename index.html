@@ -182,7 +182,8 @@ button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus
     </div>
     <div class="nav-item active" data-view="historique"><span class="icon">📊</span> <span id="nav-dash-label">Dashboard BNP</span> <span class="nav-badge" id="nav-count">0</span></div>
     <div class="nav-item" data-view="liste"><span class="icon">📋</span> Appels d'offres</div>
-    <div class="nav-item" data-view="import"><span class="icon">📥</span> Import PWise</div>
+    <div class="nav-item" data-view="suivi"><span class="icon">🎯</span> Suivi AO</div>
+    <div class="nav-item" data-view="import"><span class="icon">📥</span> Import des fichiers</div>
     <div class="nav-item" data-view="export"><span class="icon">📤</span> Export</div>
     <div style="position:absolute;bottom:52px;left:0;right:0;padding:0 16px">
       <div id="user-badge" style="padding:8px 10px;border-radius:8px;background:rgba(255,255,255,0.05);text-align:center"></div>
@@ -1129,7 +1130,7 @@ function getDashAOs() {
 }
 function getDashOpenAOs() { return getDashAOs().filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
-  let f = allAOs;
+  let f = clientAOs(allAOs);
   if(filters.statut==="clos_nontraite") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
   else if(filters.statut==="clos_traite") f=f.filter(a=>a.statut==="clos"&&hasTraitement(a));
   else if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
@@ -1160,10 +1161,11 @@ function navigate(view) {
 async function renderView() {
   try {
     await loadAOs();
-    document.getElementById("nav-count").textContent = getOpenAOs().length;
+    document.getElementById("nav-count").textContent = clientAOs(getOpenAOs()).length;
     const main = document.getElementById("main-content");
     if(currentView==="dashboard") renderDashboard(main);
     else if(currentView==="liste") renderListe(main);
+    else if(currentView==="suivi") renderSuivi(main);
     else if(currentView==="historique") renderHistorique(main);
     else if(currentView==="import") renderImport(main);
     else if(currentView==="export") renderExport(main);
@@ -1685,10 +1687,11 @@ function renderDashboard(el) {
 }
 // ===================== LISTE AO =====================
 function renderListe(el) {
+  const scope = clientAOs(allAOs);
   const open = getOpenAOs();
-  const depts = ["Tous",...new Set(allAOs.map(a=>a.dept))];
-  const cats = ["Tous",...new Set(allAOs.map(a=>categorize(a.profil)))];
-  const bms = ["Tous",...new Set(allAOs.map(a=>a.bm||"—").filter(Boolean))];
+  const depts = ["Tous",...new Set(scope.map(a=>a.dept))];
+  const cats = ["Tous",...new Set(scope.map(a=>categorize(a.profil)))];
+  const bms = ["Tous",...new Set(scope.map(a=>a.bm||"—").filter(Boolean))];
   const filtered = getFilteredAOs();
   let tableRows = filtered.map(a=>{
     const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
@@ -1720,7 +1723,7 @@ function renderListe(el) {
   }
   const sortArrow = c => sort.col===c ? (sort.dir===1?" ▲":" ▼") : "";
   el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Appels d'offres <span style="font-weight:400;font-size:16px;color:var(--gray)">${clientMeta(selectedClient).label} · ${filtered.length} résultat${filtered.length>1?"s":""}</span></h1>
     <div class="filter-bar">
       <input type="text" id="f_search" placeholder="🔍 Rechercher..." value="${filters.search}">
       <select id="f_dept">${depts.map(d=>`<option value="${d}"${filters.dept===d?" selected":""}>${d==="Tous"?"Département":d}</option>`).join("")}</select>
@@ -1919,6 +1922,71 @@ function renderDetail(el, rfc) {
     }
   });
 }
+// ===================== SUIVI ÉQUIPE (transverse, tous clients) =====================
+let suiviF = { membre:"Tous", client:"Tous", inclureDemarres:false };
+function clientColor(id){ return {BNP:"#00915a", BPCE:"#8b5cf6", OBMS:"#0d9488"}[id] || "#64748b"; }
+function renderSuivi(el){
+  let base = allAOs.filter(a => (a.bm||"").trim() && a.statut!=="clos");
+  if(!suiviF.inclureDemarres) base = base.filter(a => !a.dateDemarrage);
+  const membres = ["Tous", ...[...new Set(base.map(a=>a.bm))].sort((x,y)=>x.localeCompare(y))];
+  const clientsL = ["Tous", ...[...new Set(base.map(a=>clientMeta(clientOf(a)).label))].sort()];
+  let f = base;
+  if(suiviF.membre!=="Tous") f = f.filter(a=>a.bm===suiviF.membre);
+  if(suiviF.client!=="Tous") f = f.filter(a=>clientMeta(clientOf(a)).label===suiviF.client);
+  const byM={}; f.forEach(a=>{ (byM[a.bm]=byM[a.bm]||[]).push(a); });
+  const members = Object.entries(byM).sort((a,b)=>b[1].length-a[1].length);
+  const urgents = f.filter(a=>urgency(a.dateDebut)>=2).length;
+  const cardHtml = members.map(([bm,list])=>{
+    const rows = [...list].sort((a,b)=>(parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0)).map(a=>{
+      const cid=clientOf(a); const u=urgency(a.dateDebut);
+      return `<tr class="suivi-row row${u>=2?' urg'+u:''}" data-rfc="${escHtml(a.rfc)}" tabindex="0" style="cursor:pointer">
+        <td><span class="badge" style="background:${clientColor(cid)}">${escHtml(clientMeta(cid).label)}</span></td>
+        <td class="rfc-code">${escHtml(String(a.rfc).replace(/^RFC0+/,''))}</td>
+        <td class="profil-cell" title="${escHtml(a.profil)}">${escHtml(a.profil)}</td>
+        <td>${statutPill(statutComplet(a),a)}</td>
+        <td style="font-size:11.5px">${a.dateReponse||'<span class="empty-cell">—</span>'}</td>
+        <td style="font-size:11.5px">${a.dateDebut||'<span class="empty-cell">—</span>'}</td>
+      </tr>`;
+    }).join("");
+    return `<div class="card">
+      <div class="card-title" style="display:flex;align-items:center;gap:10px">
+        <span style="color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${escHtml(bm)}</span>
+        <span style="font-weight:400;color:var(--gray)">${list.length} AO en cours</span>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>RFC</th><th>Profil</th><th>Statut</th><th>Réponse</th><th>Échéance</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  }).join("");
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <h1 style="font-size:24px;font-weight:800">🎯 Suivi des AO en cours de traitement</h1>
+      <span style="font-size:13px;color:var(--gray)">tous clients confondus</span>
+    </div>
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${f.length}</div><div class="kpi-label">AO attribués en cours</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${members.length}</div><div class="kpi-label">Membres actifs</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${urgents?'var(--red)':'var(--green)'}">${urgents}</div><div class="kpi-label">Échéance proche</div></div>
+    </div>
+    <div class="filter-bar">
+      <select id="sf_membre">${membres.map(m=>`<option value="${escHtml(m)}"${suiviF.membre===m?" selected":""}>${m==="Tous"?"Tous les membres":escHtml(m)}</option>`).join("")}</select>
+      <select id="sf_client">${clientsL.map(c=>`<option value="${escHtml(c)}"${suiviF.client===c?" selected":""}>${c==="Tous"?"Tous les clients":escHtml(c)}</option>`).join("")}</select>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);cursor:pointer"><input type="checkbox" id="sf_dem"${suiviF.inclureDemarres?" checked":""}> inclure les démarrés</label>
+    </div>
+    ${members.length ? cardHtml : `<div class="card" style="text-align:center;padding:40px;color:var(--gray)"><div style="font-size:40px;margin-bottom:12px">📭</div><h3 style="margin-bottom:6px">Aucun AO attribué en cours</h3><p style="font-size:13px">Attribuez un AO à un membre via le champ « BM qui traite » dans le détail d'un appel d'offres, depuis n'importe quel client.</p></div>`}
+    <div id="suivi-detail-area"></div>
+  `;
+  document.getElementById("sf_membre").addEventListener("change",e=>{suiviF.membre=e.target.value;renderSuivi(el);});
+  document.getElementById("sf_client").addEventListener("change",e=>{suiviF.client=e.target.value;renderSuivi(el);});
+  document.getElementById("sf_dem").addEventListener("change",e=>{suiviF.inclureDemarres=e.target.checked;renderSuivi(el);});
+  document.querySelectorAll(".suivi-row").forEach(tr=>{
+    const open=()=>{ renderDetail(document.getElementById("suivi-detail-area"), tr.dataset.rfc); document.getElementById("suivi-detail-area").scrollIntoView({behavior:"smooth",block:"start"}); };
+    tr.addEventListener("click",open);
+    tr.addEventListener("keydown",e=>{ if(e.key==="Enter") open(); });
+  });
+}
+
 // ===================== HISTORIQUE =====================
 let histF = { dept: "Tous", cat: "Tous", statut: "Tous", statutAO: "Tous", domain: "Tous", statutPwise: "Tous" };
 function suiviFromPwise(sp) {
@@ -2666,7 +2734,7 @@ function obmsToAOs(rows){
 // ── (S) Rendu UI — séparé de la logique métier ──
 function renderImport(el) {
   el.innerHTML = `
-    <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import PWise</h1>
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import des fichiers</h1>
     <p style="font-size:13px;color:var(--gray);margin-bottom:20px">
       Importez les AOs depuis PWise — texte copié, fichier .txt ou fichier .json (bookmarklet).
     </p>
