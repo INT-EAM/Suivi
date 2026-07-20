@@ -638,6 +638,222 @@ function fwSuggest(profil){
 }
 // Code effectif : saisie manuelle prioritaire, sinon extrapolation.
 function fwEffective(a){ return a.codeFramework || fwSuggest(a.profil); }
+
+// ===================== GRILLE BPCE 2026 =====================
+// [profil, typologie, niveau(1-4), tjmIDF, tjmProvince] — EUR HT
+const BPCE_GRID = [
+  ["Analyste","Cycle de vie des applications",1,410,360],
+  ["Analyste","Cycle de vie des applications",2,440,390],
+  ["Analyste","Cycle de vie des applications",3,450,410],
+  ["Analyste","Cycle de vie des applications",4,490,425],
+  ["Concepteur","Cycle de vie des applications",1,440,390],
+  ["Concepteur","Cycle de vie des applications",2,480,420],
+  ["Concepteur","Cycle de vie des applications",3,515,440],
+  ["Concepteur","Cycle de vie des applications",4,560,470],
+  ["Développeur API","Cycle de vie des applications",1,400,350],
+  ["Développeur API","Cycle de vie des applications",2,460,390],
+  ["Développeur API","Cycle de vie des applications",3,510,430],
+  ["Développeur API","Cycle de vie des applications",4,540,460],
+  ["Développeur mobile « Natif »","Cycle de vie des applications",1,415,330],
+  ["Développeur mobile « Natif »","Cycle de vie des applications",2,460,370],
+  ["Développeur mobile « Natif »","Cycle de vie des applications",3,500,440],
+  ["Développeur mobile « Natif »","Cycle de vie des applications",4,570,485],
+  ["Développeur NTIC","Cycle de vie des applications",1,410,340],
+  ["Développeur NTIC","Cycle de vie des applications",2,450,380],
+  ["Développeur NTIC","Cycle de vie des applications",3,495,405],
+  ["Développeur NTIC","Cycle de vie des applications",4,540,450],
+  ["Développeur Technos Classiques","Cycle de vie des applications",1,380,330],
+  ["Développeur Technos Classiques","Cycle de vie des applications",2,440,365],
+  ["Développeur Technos Classiques","Cycle de vie des applications",3,490,395],
+  ["Développeur Technos Classiques","Cycle de vie des applications",4,540,465],
+  ["Développeur Web / Web service - Front end et back end","Cycle de vie des applications",1,410,340],
+  ["Développeur Web / Web service - Front end et back end","Cycle de vie des applications",2,460,370],
+  ["Développeur Web / Web service - Front end et back end","Cycle de vie des applications",3,490,415],
+  ["Développeur Web / Web service - Front end et back end","Cycle de vie des applications",4,560,480],
+  ["Intégrateur","Cycle de vie des applications",1,400,345],
+  ["Intégrateur","Cycle de vie des applications",2,455,390],
+  ["Intégrateur","Cycle de vie des applications",3,510,430],
+  ["Intégrateur","Cycle de vie des applications",4,560,470],
+  ["Paramétreur de progiciels / Consultant SI Progiciel bancaire","Cycle de vie des applications",1,425,365],
+  ["Paramétreur de progiciels / Consultant SI Progiciel bancaire","Cycle de vie des applications",2,485,410],
+  ["Paramétreur de progiciels / Consultant SI Progiciel bancaire","Cycle de vie des applications",3,530,440],
+  ["Pardamétreur de progiciels / Consultant SI Progiciel bancaire","Cycle de vie des applications",4,580,470],
+  ["Test / Homologation","Cycle de vie des applications",1,375,325],
+  ["Test / Homologation","Cycle de vie des applications",2,430,360],
+  ["Test / Homologation","Cycle de vie des applications",3,470,390],
+  ["Test / Homologation","Cycle de vie des applications",4,510,430],
+  ["Urbaniste des Systèmes d’Information (SI)","Cycle de vie des applications",1,465,420],
+  ["Urbaniste des Systèmes d’Information (SI)","Cycle de vie des applications",2,530,475],
+  ["Urbaniste des Systèmes d’Information (SI)","Cycle de vie des applications",3,580,520],
+  ["Urbaniste des Systèmes d’Information (SI)","Cycle de vie des applications",4,655,590],
+  ["Développeur BI / Décisionnel","Cycle de vie des applications",1,450,427],
+  ["Développeur BI / Décisionnel","Cycle de vie des applications",2,539,476],
+  ["Développeur BI / Décisionnel","Cycle de vie des applications",3,610,558],
+  ["Développeur BI / Décisionnel","Cycle de vie des applications",4,680,597],
+  ["Développeur Big Data","Cycle de vie des applications",1,470,435],
+  ["Développeur Big Data","Cycle de vie des applications",2,535,496],
+  ["Développeur Big Data","Cycle de vie des applications",3,642,568],
+  ["Développeur Big Data","Cycle de vie des applications",4,710,598],
+  ["Architecte Technique","Data Analytics",1,455,400],
+  ["Architecte Technique","Data Analytics",2,560,480],
+  ["Architecte Technique","Data Analytics",3,620,530],
+  ["Architecte Technique","Data Analytics",4,670,575],
+  ["Data analyst","Data Analytics",1,440,380],
+  ["Data analyst","Data Analytics",2,510,445],
+  ["Data analyst","Data Analytics",3,590,500],
+  ["Data analyst","Data Analytics",4,660,540],
+  ["Data scientist","Data Analytics",1,475,410],
+  ["Data scientist","Data Analytics",2,560,470],
+  ["Data scientist","Data Analytics",3,655,535],
+  ["Data scientist","Data Analytics",4,755,635],
+  ["Data steward","Data Analytics",1,410,365],
+  ["Data steward","Data Analytics",2,480,410],
+  ["Data steward","Data Analytics",3,550,455],
+  ["Data steward","Data Analytics",4,640,500],
+  ["Digital analyst","Data Analytics",1,420,370],
+  ["Digital analyst","Data Analytics",2,490,430],
+  ["Digital analyst","Data Analytics",3,550,470],
+  ["Digital analyst","Data Analytics",4,630,500],
+  ["UI designer","Design, Marketing",1,420,365],
+  ["UI designer","Design, Marketing",2,490,420],
+  ["UI designer","Design, Marketing",3,550,460],
+  ["UI designer","Design, Marketing",4,610,540],
+  ["UX designer","Design, Marketing",1,440,385],
+  ["UX designer","Design, Marketing",2,510,440],
+  ["UX designer","Design, Marketing",3,580,500],
+  ["UX designer","Design, Marketing",4,620,560],
+  ["Webmaster","Design, Marketing",1,390,335],
+  ["Webmaster","Design, Marketing",2,440,375],
+  ["Webmaster","Design, Marketing",3,490,415],
+  ["Webmaster","Design, Marketing",4,530,450],
+  ["Chargé de déploiement produit","Pilotage et Méthodologie Digital",1,410,350],
+  ["Chargé de déploiement produit","Pilotage et Méthodologie Digital",2,485,420],
+  ["Chargé de déploiement produit","Pilotage et Méthodologie Digital",3,545,480],
+  ["Chargé de déploiement produit","Pilotage et Méthodologie Digital",4,620,525],
+  ["Chef de projet Innovation","Pilotage et Méthodologie Digital",1,490,420],
+  ["Chef de projet Innovation","Pilotage et Méthodologie Digital",2,560,485],
+  ["Chef de projet Innovation","Pilotage et Méthodologie Digital",3,630,535],
+  ["Chef de projet Innovation","Pilotage et Méthodologie Digital",4,690,590],
+  ["Coach Agile","Pilotage et Méthodologie Digital",1,545,460],
+  ["Coach Agile","Pilotage et Méthodologie Digital",2,630,530],
+  ["Coach Agile","Pilotage et Méthodologie Digital",3,730,620],
+  ["Coach Agile","Pilotage et Méthodologie Digital",4,830,710],
+  ["Lead Développeur Front End","Pilotage et Méthodologie Digital",1,460,380],
+  ["Lead Développeur Front End","Pilotage et Méthodologie Digital",2,520,440],
+  ["Lead Développeur Front End","Pilotage et Méthodologie Digital",3,575,490],
+  ["Lead Développeur Front End","Pilotage et Méthodologie Digital",4,630,540],
+  ["Product owner","Pilotage et Méthodologie Digital",1,470,405],
+  ["Product owner","Pilotage et Méthodologie Digital",2,540,460],
+  ["Product owner","Pilotage et Méthodologie Digital",3,615,510],
+  ["Product owner","Pilotage et Méthodologie Digital",4,680,565],
+  ["Scrum Master","Pilotage et Méthodologie Digital",1,470,395],
+  ["Scrum Master","Pilotage et Méthodologie Digital",2,540,450],
+  ["Scrum Master","Pilotage et Méthodologie Digital",3,610,500],
+  ["Scrum Master","Pilotage et Méthodologie Digital",4,670,555],
+  ["Chargé de pilotage SI (PMO)","Pilotage et Méthodologie MOE/MOA",1,440,375],
+  ["Chargé de pilotage SI (PMO)","Pilotage et Méthodologie MOE/MOA",2,470,425],
+  ["Chargé de pilotage SI (PMO)","Pilotage et Méthodologie MOE/MOA",3,550,440],
+  ["Chargé de pilotage SI (PMO)","Pilotage et Méthodologie MOE/MOA",4,630,520],
+  ["Chef de Projet Métier","Pilotage et Méthodologie MOE/MOA",1,480,410],
+  ["Chef de Projet Métier","Pilotage et Méthodologie MOE/MOA",2,535,460],
+  ["Chef de Projet Métier","Pilotage et Méthodologie MOE/MOA",3,590,500],
+  ["Chef de Projet Métier","Pilotage et Méthodologie MOE/MOA",4,650,540],
+  ["Chef de projet SI","Pilotage et Méthodologie MOE/MOA",1,470,400],
+  ["Chef de projet SI","Pilotage et Méthodologie MOE/MOA",2,530,450],
+  ["Chef de projet SI","Pilotage et Méthodologie MOE/MOA",3,590,490],
+  ["Chef de projet SI","Pilotage et Méthodologie MOE/MOA",4,640,550],
+  ["Consultant Change Management","Pilotage et Méthodologie MOE/MOA",1,440,395],
+  ["Consultant Change Management","Pilotage et Méthodologie MOE/MOA",2,480,430],
+  ["Consultant Change Management","Pilotage et Méthodologie MOE/MOA",3,520,470],
+  ["Consultant Change Management","Pilotage et Méthodologie MOE/MOA",4,570,515],
+  ["Consultant en Systèmes d’Information (SI)","Pilotage et Méthodologie MOE/MOA",1,460,400],
+  ["Consultant en Systèmes d’Information (SI)","Pilotage et Méthodologie MOE/MOA",2,510,450],
+  ["Consultant en Systèmes d’Information (SI)","Pilotage et Méthodologie MOE/MOA",3,560,505],
+  ["Consultant en Systèmes d’Information (SI)","Pilotage et Méthodologie MOE/MOA",4,610,550],
+  ["Consultant Métier / Business Analyst","Pilotage et Méthodologie MOE/MOA",1,445,380],
+  ["Consultant Métier / Business Analyst","Pilotage et Méthodologie MOE/MOA",2,515,445],
+  ["Consultant Métier / Business Analyst","Pilotage et Méthodologie MOE/MOA",3,540,495],
+  ["Consultant Métier / Business Analyst","Pilotage et Méthodologie MOE/MOA",4,620,560],
+  ["Directeur de Projet","Pilotage et Méthodologie MOE/MOA",1,590,505],
+  ["Directeur de Projet","Pilotage et Méthodologie MOE/MOA",2,645,550],
+  ["Directeur de Projet","Pilotage et Méthodologie MOE/MOA",3,690,580],
+  ["Directeur de Projet","Pilotage et Méthodologie MOE/MOA",4,720,615],
+  ["Expert Méthode","Pilotage et Méthodologie MOE/MOA",1,470,420],
+  ["Expert Méthode","Pilotage et Méthodologie MOE/MOA",2,520,450],
+  ["Expert Méthode","Pilotage et Méthodologie MOE/MOA",3,580,520],
+  ["Expert Méthode","Pilotage et Méthodologie MOE/MOA",4,620,560]
+];
+function bpceCodeStr(profil,niv){ return profil+" · N"+niv; }
+const BPCE_BY_KEY = {};
+BPCE_GRID.forEach(r=>{ BPCE_BY_KEY[bpceCodeStr(r[0],r[2])] = {profil:r[0],typo:r[1],niv:r[2],idf:r[3],prov:r[4]}; });
+function bpceNorm(s){ return (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase(); }
+function bpceInfo(code){ if(!code) return null; const c=code.trim(); if(BPCE_BY_KEY[c]) return BPCE_BY_KEY[c]; const n=bpceNorm(c); for(const k in BPCE_BY_KEY){ if(bpceNorm(k)===n) return BPCE_BY_KEY[k]; } return null; }
+function bpceLabel(code){ const g=bpceInfo(code); return g ? (g.profil+" N"+g.niv+" — TJM "+g.idf+"€ IDF / "+g.prov+"€ Province ("+g.typo+")") : ""; }
+function bpceDatalistHtml(){ return '<datalist id="bpce-codes">'+BPCE_GRID.map(r=>'<option value="'+escHtml(bpceCodeStr(r[0],r[2]))+'">'+escHtml(r[0]+" N"+r[2]+" · "+r[3]+"€ IDF / "+r[4]+"€ Prov · "+r[1])+'</option>').join("")+'</datalist>'; }
+const BPCE_RULES = [
+  [/data scientist/, "Data scientist"],
+  [/data steward/, "Data steward"],
+  [/digital analyst/, "Digital analyst"],
+  [/data analyst|data.*business analyst|business analyst.*data/, "Data analyst"],
+  [/architecte technique|leader technique|tech lead/, "Architecte Technique"],
+  [/\bux\b|ux design|designer ux/, "UX designer"],
+  [/\bui\b|ui design|designer ui/, "UI designer"],
+  [/webmaster/, "Webmaster"],
+  [/coach agile/, "Coach Agile"],
+  [/scrum master/, "Scrum Master"],
+  [/product owner|\bpo\b/, "Product owner"],
+  [/lead.*front|front.*lead/, "Lead Développeur Front End"],
+  [/deploiement produit|charge de deploiement/, "Chargé de déploiement produit"],
+  [/chef de projet innovation|manager innovation|responsable innovation/, "Chef de projet Innovation"],
+  [/\bpmo\b|pilotage si/, "Chargé de pilotage SI (PMO)"],
+  [/change management|conduite du changement/, "Consultant Change Management"],
+  [/chef de projet metier|cdp metier/, "Chef de Projet Métier"],
+  [/directeur de projet/, "Directeur de Projet"],
+  [/expert methode|methodolog/, "Expert Méthode"],
+  [/chef de projet|\bcdp\b|chef de proj/, "Chef de projet SI"],
+  [/business analyst|consultant fonctionnel|consultant metier|charge de mission|\bba\b/, "Consultant Métier / Business Analyst"],
+  [/consultant.*si|consultant en systeme/, "Consultant en Systèmes d’Information (SI)"],
+  [/urbaniste/, "Urbaniste des Systèmes d’Information (SI)"],
+  [/parametr|progiciel/, "Paramétreur de progiciels / Consultant SI Progiciel bancaire"],
+  [/integrateur/, "Intégrateur"],
+  [/test|homologation|recette|\bqa\b|homolog/, "Test / Homologation"],
+  [/big data/, "Développeur Big Data"],
+  [/\bbi\b|decisionnel/, "Développeur BI / Décisionnel"],
+  [/mobile|\bios\b|android|natif/, "Développeur mobile « Natif »"],
+  [/\bapi\b/, "Développeur API"],
+  [/\bntic\b/, "Développeur NTIC"],
+  [/cobol|mainframe|technos classiques|pl\/?sql|as ?400/, "Développeur Technos Classiques"],
+  [/web|full ?stack|fullstack|front|back|react|angular|\bjava\b|\bphp\b|\.net|node/, "Développeur Web / Web service - Front end et back end"],
+  [/developpeur|developpement|software|concept.*develop/, "Développeur Technos Classiques"],
+  [/concepteur/, "Concepteur"],
+  [/analyste/, "Analyste"]
+];
+// Suggestion du profil+niveau BPCE depuis l'intitule (best-effort ; niveau par defaut = N2)
+function bpceSuggest(profil){
+  const p=bpceNorm(profil);
+  let niv=0; const m=p.match(/\bn([1-4])\b/);
+  if(m) niv=+m[1];
+  else if(/expert/.test(p)) niv=4;
+  else if(/senior/.test(p)) niv=3;
+  else if(/confirme/.test(p)) niv=2;
+  else if(/junior|debutant/.test(p)) niv=1;
+  let prof="";
+  for(const r of BPCE_RULES){ if(r[0].test(p)){ prof=r[1]; break; } }
+  if(!prof) return "";
+  if(!niv) niv=2;
+  const avail=BPCE_GRID.filter(r=>r[0]===prof).map(r=>r[2]).sort((a,b)=>a-b);
+  if(!avail.length) return "";
+  const best=avail.includes(niv)?niv:(avail.filter(l=>l<=niv).pop() ?? avail[0]);
+  return bpceCodeStr(prof,best);
+}
+// ===================== DISPATCH GRILLE (client-aware) =====================
+function gridStored(a){ return clientOf(a)==="BPCE" ? (a.codeBPCE||"") : (a.codeFramework||""); }
+function gridSuggest(a){ return clientOf(a)==="BPCE" ? bpceSuggest(a.profil) : fwSuggest(a.profil); }
+function gridEffective(a){ return gridStored(a) || gridSuggest(a); }
+function gridLabel(a,code){ return clientOf(a)==="BPCE" ? bpceLabel(code) : fwLabel(code); }
+function gridMax(a,code){ return clientOf(a)==="BPCE" ? (bpceInfo(code)?.idf ?? "") : (fwInfo(code)?.tjmMax ?? ""); }
+function gridShort(a,code){ if(clientOf(a)==="BPCE"){ const i=bpceInfo(code); return i ? ("N"+i.niv+"·"+i.idf+"€") : code; } return code; }
+
 // ===================== BASE DE DONNÉES =====================
 let memoryStore = { aos: [], imports: [] };
 const useSupabase = SUPABASE_URL && SUPABASE_KEY;
@@ -915,7 +1131,7 @@ function getFilteredAOs() {
   else if(filters.statut==="tous_clos") { /* all, no filter */ }
   else if(filters.statut!=="Tous") f=f.filter(a=>a.statut!=="clos"&&statutSuivi(a)===filters.statut);
   else { /* Tous = show all including clos */ }
-  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||"",a.codeFramework||""].some(v=>(v||"").toLowerCase().includes(s)));}
+  if(filters.search){const s=filters.search.toLowerCase();f=f.filter(a=>[a.rfc,a.intitule,a.profil,a.org,a.dept,a.bm||"",a.consultant||"",a.codeFramework||"",a.codeBPCE||""].some(v=>(v||"").toLowerCase().includes(s)));}
   if(filters.dept!=="Tous") f=f.filter(a=>a.dept===filters.dept);
   if(filters.cat!=="Tous") f=f.filter(a=>categorize(a.profil)===filters.cat);
   if(filters.bm!=="Tous") f=f.filter(a=>(a.bm||"")===(filters.bm==="—"?"":filters.bm));
@@ -1473,8 +1689,7 @@ function renderListe(el) {
     const cat=categorize(a.profil), u=urgency(a.dateDebut), sc=statutComplet(a);
     const isClos=a.statut==="clos";
     const sel=selectedRFC===a.rfc;
-    const fwSug=!a.codeFramework?fwSuggest(a.profil):"";
-    const fwEff=a.codeFramework||fwSug;
+    const gStored=gridStored(a); const fwSug=!gStored?gridSuggest(a):""; const fwEff=gStored||fwSug;
     return `<tr class="row${u&&!isClos?" urg"+u:""}${isClos?" clos":""}${sel?" selected":""}" data-rfc="${a.rfc}" tabindex="0">
       <td class="rfc-code">${a.rfc.replace("RFC0000","").replace("RFC000","")}</td>
       <td><span class="badge" style="background:${CAT_COLORS[cat]}">${cat}</span></td>
@@ -1485,7 +1700,7 @@ function renderListe(el) {
       <td class="${a.bm?"tri-cell":"empty-cell"}">${a.bm||"—"}</td>
       <td class="${a.consultant?"tri-cell":"empty-cell"}">${a.consultant||"—"}</td>
       <td class="r" style="font-size:11.5px">${a.tjm?a.tjm+"€":"—"}</td>
-      <td class="rfc-code" title="${escHtml(fwLabel(fwEff))}${fwSug?" — code extrapolé de l&#39;intitulé (non enregistré)":""}">${a.codeFramework||(fwSug?`<span style="color:#94a3b8;font-style:italic">${fwSug}*</span>`:'<span class="empty-cell">—</span>')}</td>
+      <td class="rfc-code" title="${escHtml(gridLabel(a,fwEff))}${fwSug?" — déduit de l&#39;intitulé (non enregistré)":""}">${gStored?escHtml(gridShort(a,gStored)):(fwSug?`<span style="color:#94a3b8;font-style:italic">${escHtml(gridShort(a,fwSug))}*</span>`:'<span class="empty-cell">—</span>')}</td>
       <td>${statutPill(sc,a)}${a.notes?` <span title="${escHtml(a.notes.substring(0,100))}" style="cursor:help">📝</span>`:""}</td>
       <td style="font-size:10px;color:var(--text-light);text-align:center" title="${a.modifiedAt?'Modifié le '+new Date(a.modifiedAt).toLocaleDateString('fr-FR'):''}">
         ${a.modifiedBy?`<span style="font-weight:600;color:var(--green)">${a.modifiedBy}</span>`:'—'}
@@ -1602,8 +1817,11 @@ function renderDetail(el, rfc) {
           <div class="field"><label>Date réponse</label><input type="date" id="d_dateReponse" value="${ao.dateReponse||""}"></div>
           <div class="field"><label>Consultant poussé</label><input class="tri" id="d_consultant" maxlength="4" placeholder="FIB" value="${ao.consultant||""}"></div>
           <div class="field"><label>TJM proposé (€)</label><input type="number" id="d_tjm" placeholder="450" value="${ao.tjm||""}"></div>
+          ${clientOf(ao)==="BPCE" ? `
+          <div class="field"><label>Grille BPCE (TJM)${!ao.codeBPCE&&bpceSuggest(ao.profil)?' <span style="color:var(--amber)" title="Profil déduit de l&#39;intitulé — vérifiez le niveau puis Enregistrer">⚡ auto</span>':''}</label><input id="d_codefw" list="bpce-codes" style="font-family:inherit;font-size:12px" placeholder="ex: Analyste · N2" value="${escHtml(ao.codeBPCE||bpceSuggest(ao.profil))}"><div id="fw-hint" style="font-size:10px;color:var(--text-light);margin-top:2px">${escHtml(bpceLabel(ao.codeBPCE||bpceSuggest(ao.profil)))}</div></div>
+          ${bpceDatalistHtml()}` : `
           <div class="field"><label>Code framework 2026${!ao.codeFramework&&fwSuggest(ao.profil)?' <span style="color:var(--amber)" title="Code extrapolé de l&#39;intitulé — Enregistrer pour valider">⚡ auto</span>':''}</label><input id="d_codefw" list="fw-codes" maxlength="10" style="text-transform:uppercase;font-family:monospace;letter-spacing:0.5px" placeholder="ex: BANA3" value="${ao.codeFramework||fwSuggest(ao.profil)}"><div id="fw-hint" style="font-size:10px;color:var(--text-light);margin-top:2px">${fwLabel(ao.codeFramework||fwSuggest(ao.profil))}</div></div>
-          ${fwDatalistHtml()}
+          ${fwDatalistHtml()}`}
           <div class="field"><label>Qualif obtenue</label>
             <select id="d_qualif"><option value=""${!ao.dateQualif?" selected":""}>Non</option><option value="oui"${ao.dateQualif?" selected":""}>Oui</option></select>
           </div>
@@ -1649,7 +1867,7 @@ function renderDetail(el, rfc) {
     if(e.target.value&&!document.getElementById("d_dateDemarrage").value) document.getElementById("d_dateDemarrage").value=today();
   });
   document.getElementById("d_codefw").addEventListener("input",e=>{
-    document.getElementById("fw-hint").textContent=fwLabel(e.target.value);
+    document.getElementById("fw-hint").textContent=gridLabel(ao,e.target.value);
   });
   document.getElementById("save-detail").addEventListener("click",async()=>{
     ao.bm = document.getElementById("d_bm").value.toUpperCase().trim();
@@ -1657,7 +1875,7 @@ function renderDetail(el, rfc) {
     ao.dateReponse = document.getElementById("d_dateReponse").value;
     ao.consultant = document.getElementById("d_consultant").value.toUpperCase().trim();
     ao.tjm = document.getElementById("d_tjm").value;
-    ao.codeFramework = document.getElementById("d_codefw").value.toUpperCase().trim();
+    { const _cv=document.getElementById("d_codefw").value.trim(); if(clientOf(ao)==="BPCE"){ ao.codeBPCE=_cv; } else { ao.codeFramework=_cv.toUpperCase(); } }
     ao.dateQualif = document.getElementById("d_qualif").value ? document.getElementById("d_dateQualif").value : "";
     ao.dateDemarrage = document.getElementById("d_demarrage").value ? document.getElementById("d_dateDemarrage").value : "";
     ao.notes = document.getElementById("d_notes").value.trim();
@@ -2623,7 +2841,7 @@ async function doExportCSV(){
   let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Code framework;TJM max grille;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
   aos.forEach(a=>{
     const ss=statutComplet(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${fwEffective(a)||""};${fwInfo(fwEffective(a))?.tjmMax??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
+    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${gridEffective(a)||""};${gridMax(a,gridEffective(a))??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
   });
   download("ao_bcef_export.csv", "﻿"+csv, "text/csv;charset=utf-8;");
 }
