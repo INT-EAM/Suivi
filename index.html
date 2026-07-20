@@ -199,6 +199,7 @@ const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
 // BNP = client historique. Chaque nouveau client = une entrée ici (active:true).
 const CLIENTS = [
   { id:"BNP", label:"BNP Paribas", source:"PWise / OneProcTool", excluded:["IECC","DIFA","MDEP"], active:true },
+  { id:"BPCE", label:"BPCE (Harmoni)", source:"Harmoni RFx", excluded:[], active:true },
 ];
 const DEFAULT_CLIENT = "BNP";
 let selectedClient = DEFAULT_CLIENT;
@@ -2333,6 +2334,63 @@ function formatSyncResult(c, label, date = "") {
     </span>
   </div>`;
 }
+// ── Transformation export Harmoni (BPCE) → objets AO ──
+function harmoniToAOs(data){
+  if (data && Array.isArray(data.aos) && data.source==="harmoni-bpce") return data.aos; // déjà transformé
+  const rows = (data && data.dossiers) || (Array.isArray(data)?data:[]);
+  const isoD = s => { s=(s||"").split(" ")[0].trim(); const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); return m?`${m[3]}-${m[2]}-${m[1]}`:""; };
+  const splitLib = lib => {
+    lib=(lib||"").trim().replace(/^N\s*-\s*/i,"").replace(/^N-\s*/i,"");
+    const parts=lib.split(" - ").map(x=>x.trim()).filter(Boolean);
+    if(!parts.length) return ["Autre", lib || "(sans intitulé)"];
+    return [parts[0], parts.length>1?parts.slice(1).join(" - "):parts[0]];
+  };
+  // casse canonique des filiales (fusionne Natixis/NATIXIS…)
+  const fold={};
+  rows.forEach(r=>{ const o=splitLib(r.libelle)[0], f=o.toLowerCase(); (fold[f]=fold[f]||{})[o]=(fold[f][o]||0)+1; });
+  const canon={}; Object.keys(fold).forEach(f=>{ canon[f]=Object.entries(fold[f]).sort((a,b)=>b[1]-a[1])[0][0]; });
+  const extract = (data && data.extractDate) ? String(data.extractDate).slice(0,10) : today();
+  const out=[], seen={};
+  rows.forEach(r=>{
+    const rfc=(r.dossierAchat||"").trim(); if(!rfc||seen[rfc]) return; seen[rfc]=1;
+    const sp=splitLib(r.libelle); const org=canon[sp[0].toLowerCase()]||sp[0];
+    const clos=(r.statutRFx||"").trim()==="Clos";
+    out.push({ ...AO_DEFAULTS, client:"BPCE",
+      rfc, tm: r.numLot?("Lot "+r.numLot):"",
+      intitule:(r.libelle||"").trim(), org, dept:org,
+      statutPwise:(r.avancementReponse||"").trim(),
+      statutRFx:(r.statutRFx||"").trim(), typeAO:(r.typeAO||"").trim(),
+      profil: sp[1]||(r.libelle||"").trim(), modalite:"",
+      dateDebut:(r.dateDebut||"").split(" ")[0], dateFin:(r.dateFin||"").split(" ")[0], nbJours:0,
+      statut: clos?"clos":"ouvert", dateCloture: clos?isoD(r.dateFin):"",
+      dateOuverture: isoD(r.dateDebut), dateCreation: isoD(r.dateDebut)||extract,
+      isHistorique:false, dernierImport:extract });
+  });
+  return out;
+}
+// ── Import scopé par client — n'affecte JAMAIS les autres clients ──
+async function importClientAOs(parsed, clientId, { logImport = false } = {}) {
+  const existing = await dbGetAll("aos");
+  const exMap = Object.fromEntries(existing.map(a => [a.rfc, a]));
+  const c = { added:0, updated:0 };
+  const toSave = [];
+  parsed.forEach(p => {
+    const ex = exMap[p.rfc];
+    if (!ex) { toSave.push({ ...p, client: clientId }); c.added++; }
+    else {
+      // MAJ des infos Harmoni + préservation du suivi manuel
+      toSave.push({ ...ex, ...p, client: clientId,
+        bm: ex.bm||"", consultant: ex.consultant||"", tjm: ex.tjm||"", notes: ex.notes||"",
+        datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"", dateQualif: ex.dateQualif||"",
+        dateDemarrage: ex.dateDemarrage||"", aRepondu: ex.aRepondu||false,
+        dateOuverture: ex.dateOuverture || p.dateOuverture, dateCreation: ex.dateCreation || p.dateCreation });
+      c.updated++;
+    }
+  });
+  if (toSave.length) await dbPutMany("aos", toSave);
+  if (logImport) await dbPut("imports", { date: today(), time: new Date().toLocaleTimeString("fr-FR"), nbParsed: parsed.length, added: c.added, updated: c.updated, closed: 0, client: clientId });
+  return c;
+}
 // ── (S) Rendu UI — séparé de la logique métier ──
 function renderImport(el) {
   el.innerHTML = `
@@ -2365,6 +2423,16 @@ function renderImport(el) {
         <span id="import-file-info" style="font-size:11px;color:var(--gray)"></span>
       </div>
       <div id="import-result"></div>
+    </div>
+    <div class="card" style="border-left:4px solid #6d28d9">
+      <div class="card-title">📦 Import BPCE (Harmoni)</div>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Déposez l'export Harmoni brut (<code>harmoni_export_*.json</code>). Les dossiers sont ajoutés / mis à jour côté client <strong>BPCE</strong> sans toucher aux AO BNP. Le suivi saisi manuellement est préservé.</p>
+      <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+        📥 Charger l'export Harmoni (.json)
+        <input type="file" id="bpce-file" accept=".json" style="display:none">
+      </label>
+      <span id="bpce-file-info" style="font-size:11px;color:var(--gray);margin-left:8px"></span>
+      <div id="bpce-result"></div>
     </div>
     <div id="import-history"></div>
   `;
@@ -2409,6 +2477,23 @@ function renderImport(el) {
     document.getElementById("import-result").innerHTML = formatSyncResult(c,
       mode === 'historique' ? "Import Historique terminé" : "Import PWise réussi !");
     loadImportHistory();
+  });
+  // ── Import BPCE (Harmoni) ──
+  const bpceInput=document.getElementById("bpce-file");
+  if(bpceInput) bpceInput.addEventListener("change", async e=>{
+    const file=e.target.files[0]; if(!file) return;
+    const info=document.getElementById("bpce-file-info");
+    const res=document.getElementById("bpce-result");
+    info.textContent="⏳ Lecture "+file.name+"...";
+    try{
+      const data=JSON.parse(await readFile(file));
+      const parsed=harmoniToAOs(data);
+      if(!parsed.length){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Aucun dossier BPCE détecté dans ce fichier.</div>'; info.textContent=""; return; }
+      const c=await importClientAOs(parsed,"BPCE",{logImport:true});
+      res.innerHTML='<div class="import-ok" style="margin-top:12px">✅ <strong>Import BPCE réussi</strong> — 🆕 '+c.added+' nouveaux · ♻️ '+c.updated+' mis à jour ('+parsed.length+' dossiers)<br><span style="font-size:12px">→ <a href="#" onclick="selectedClient=\'BPCE\';initClientSelect();navigate(\'historique\');return false;" style="color:var(--green);font-weight:600">Voir le Dashboard BPCE</a></span></div>';
+      info.textContent="✅ "+file.name;
+      loadImportHistory();
+    }catch(err){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Erreur : '+escHtml(err.message)+'</div>'; info.textContent=""; }
   });
   loadImportHistory();
 }
