@@ -208,11 +208,12 @@ const CLIENTS = [
   { id:"OBMS", label:"OBMS", source:"OBMS besoins AT", excluded:[], active:true },
   // Vue équipe : filtre par membre attribué (bm) au lieu de la plateforme
   { id:"MAS", label:"Équipe MAS", team:[
-      { tri:"OAK", aliases:["oak","akamkam"] },
-      { tri:"CKC", aliases:["ckc","kcharem"] },
-      { tri:"MBNE", aliases:["mbne","bou nasser","nasser eddine"] },
-      { tri:"FZH", aliases:["fzh","zheiman","zeiman"] },
-      { tri:"VBR", aliases:["vbr","brouillard"] },
+      { tri:"OAK",  aliases:["akamkam"] },
+      { tri:"CKC",  aliases:["kcharem"] },
+      { tri:"MBNE", aliases:["bou nasser","nasser eddine"] },
+      { tri:"FZH",  aliases:["zheiman","zeiman"] },
+      { tri:"VBR",  aliases:["brouillard"] },
+      { tri:"MAS",  aliases:["assi"] },
     ], active:true },
 ];
 const DEFAULT_CLIENT = "BNP";
@@ -220,12 +221,13 @@ let selectedClient = DEFAULT_CLIENT;
 function clientOf(ao){ return ao.client || DEFAULT_CLIENT; }
 function clientMeta(id){ return CLIENTS.find(c => c.id === id) || CLIENTS[0]; }
 function activeClients(){ return CLIENTS.filter(c => c.active); }
+function teamMemberOf(bm, meta){
+  const b = bpceNorm(bm); if(!b || !meta || !meta.team) return null;
+  return meta.team.find(m => b===bpceNorm(m.tri) || (m.aliases||[]).some(x => b.includes(x))) || null;
+}
 function clientAOs(list){
   const meta = clientMeta(selectedClient);
-  if (meta && meta.team){
-    const aliases = meta.team.flatMap(m => m.aliases);
-    return (list||[]).filter(a => { const b = bpceNorm(a.bm); return b && aliases.some(x => b.includes(x)); });
-  }
+  if (meta && meta.team) return (list||[]).filter(a => teamMemberOf(a.bm, meta));
   return (list||[]).filter(a => clientOf(a) === selectedClient);
 }
 // ===================== FRAMEWORK BNP × INTM 2026 =====================
@@ -2004,14 +2006,14 @@ function renderSuivi(el){
 
 // ===================== VUE ÉQUIPE (backlog en cours par manager) =====================
 let equipeSel = null;
+let equipeView = "backlog";
+let perfGroup = "manager";
+const PERF_DATE_FROM = "2026-07-22"; // demain — baseline du suivi de performance (AO attribués à partir de cette date)
 function teamTri(bm){
-  const meta = clientMeta(selectedClient);
-  if(!meta || !meta.team) return bm||"—";
-  const b = bpceNorm(bm);
-  const m = meta.team.find(mm => mm.aliases.some(x => b.includes(x)));
+  const m = teamMemberOf(bm, clientMeta(selectedClient));
   return m ? m.tri : (bm||"—");
 }
-function renderEquipe(el){
+function renderEquipeBacklog(el){
   // AO en cours = attribués à l'équipe, ni clos ni soumis (pas encore répondus)
   const base = clientAOs(allAOs).filter(a => a.statut!=="clos" && !aReponduAO(a));
   const byM = {};
@@ -2062,10 +2064,7 @@ function renderEquipe(el){
     </div>`;
   }
   el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-      <h1 style="font-size:24px;font-weight:800">🎯 ${escHtml(clientMeta(selectedClient).label)} — backlog en cours</h1>
-      <span style="font-size:13px;color:var(--gray)">ni clos, ni soumis · tous clients</span>
-    </div>
+    <div style="font-size:13px;color:var(--gray);margin-bottom:12px">Backlog en cours — ni clos, ni soumis · tous clients confondus</div>
     <div class="kpi-grid" style="margin-bottom:16px">
       <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${base.length}</div><div class="kpi-label">AO en cours</div><div class="kpi-sub">à traiter / en attente</div></div>
       <div class="kpi"><div class="kpi-value" style="color:var(--green)">${entries.length}</div><div class="kpi-label">Managers</div></div>
@@ -2075,17 +2074,84 @@ function renderEquipe(el){
     <div id="equipe-backlog">${backlog}</div>
   `;
   document.querySelectorAll(".equipe-bar").forEach(b=>{
-    const go=()=>{ const m=b.dataset.m; equipeSel = (equipeSel===m)?null:m; renderEquipe(el); const bl=document.getElementById("equipe-backlog"); if(bl&&equipeSel) bl.scrollIntoView({behavior:"smooth",block:"start"}); };
+    const go=()=>{ const m=b.dataset.m; equipeSel = (equipeSel===m)?null:m; renderEquipeBacklog(el); const bl=document.getElementById("equipe-backlog"); if(bl&&equipeSel) bl.scrollIntoView({behavior:"smooth",block:"start"}); };
     b.addEventListener("click",go);
     b.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
   });
   const cb=document.getElementById("equipe-close");
-  if(cb) cb.addEventListener("click",()=>{ equipeSel=null; renderEquipe(el); });
+  if(cb) cb.addEventListener("click",()=>{ equipeSel=null; renderEquipeBacklog(el); });
   document.querySelectorAll(".equipe-ao").forEach(tr=>{
     const open=()=>{ renderDetail(document.getElementById("equipe-detail-area"), tr.dataset.rfc); document.getElementById("equipe-detail-area").scrollIntoView({behavior:"smooth",block:"start"}); };
     tr.addEventListener("click",open);
     tr.addEventListener("keydown",e=>{ if(e.key==="Enter") open(); });
   });
+}
+
+function renderEquipe(el){
+  const label = clientMeta(selectedClient).label;
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <h1 style="font-size:24px;font-weight:800">🎯 ${escHtml(label)}</h1>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <button class="btn eq-tab" data-v="backlog" style="font-size:12px;${equipeView==='backlog'?'background:var(--green);color:#fff;border-color:var(--green);':''}">📋 Backlog en cours</button>
+        <button class="btn eq-tab" data-v="perf" style="font-size:12px;${equipeView==='perf'?'background:var(--green);color:#fff;border-color:var(--green);':''}">📊 Performance</button>
+      </div>
+    </div>
+    <div id="equipe-content"></div>`;
+  const content = document.getElementById("equipe-content");
+  if(equipeView==="perf") renderEquipePerf(content); else renderEquipeBacklog(content);
+  document.querySelectorAll(".eq-tab").forEach(b=>b.addEventListener("click",()=>{ equipeView=b.dataset.v; renderEquipe(el); }));
+}
+// Dashboard performance : AO attribués à partir de PERF_DATE_FROM — délais + % qualif/démarrage
+function renderEquipePerf(el){
+  const cohort = clientAOs(allAOs).filter(a => a.datePrise && normDate(a.datePrise) >= PERF_DATE_FROM);
+  const keyFn = perfGroup==="manager" ? (a=>teamTri(a.bm))
+              : perfGroup==="domaine" ? (a=>domainGroup(a.org)||"—")
+              : (a=>clientMeta(clientOf(a)).label);
+  const groups={};
+  cohort.forEach(a=>{ const k=keyFn(a)||"—"; (groups[k]=groups[k]||[]).push(a); });
+  const ent = Object.entries(groups).sort((a,b)=>b[1].length-a[1].length);
+  const metrics = list => {
+    const n=list.length;
+    const delais=list.filter(a=>a.dateReponse&&a.datePrise).map(a=>Math.round((new Date(a.dateReponse)-new Date(a.datePrise))/86400000)).filter(d=>d>=0);
+    const delaiMoy=delais.length?Math.round(delais.reduce((x,y)=>x+y,0)/delais.length):null;
+    const q=list.filter(a=>a.dateQualif).length, d=list.filter(a=>a.dateDemarrage).length;
+    return { n, delaiMoy, q, d, pq:n?Math.round(q/n*100):0, pd:n?Math.round(d/n*100):0 };
+  };
+  const rows = ent.map(([k,list])=>{
+    const m=metrics(list);
+    return `<tr style="border-bottom:1px solid #f8fafc">
+      <td style="padding:6px 8px;font-weight:700;${perfGroup==='manager'?'color:var(--green);text-transform:uppercase;letter-spacing:0.5px':''}">${escHtml(k)}</td>
+      <td style="text-align:center;font-weight:700">${m.n}</td>
+      <td style="text-align:center;color:${m.delaiMoy!==null&&m.delaiMoy>7?'var(--amber)':'var(--green)'}">${m.delaiMoy!==null?m.delaiMoy+' j':'—'}</td>
+      <td style="text-align:center;font-weight:600;color:${m.pq>=30?'var(--green)':'var(--amber)'}">${m.pq}% <span style="color:var(--text-light);font-size:11px">(${m.q})</span></td>
+      <td style="text-align:center;font-weight:600;color:${m.pd>=15?'var(--green)':'var(--amber)'}">${m.pd}% <span style="color:var(--text-light);font-size:11px">(${m.d})</span></td>
+    </tr>`;
+  }).join("");
+  const T=metrics(cohort);
+  const gLabel = perfGroup==='manager'?'Manager':perfGroup==='domaine'?'Domaine':'Client';
+  const tabStyle = a => perfGroup===a?'background:var(--green);color:#fff;border-color:var(--green);':'';
+  el.innerHTML = `
+    <div style="font-size:13px;color:var(--gray);margin-bottom:12px">Suivi de performance — AO attribués à partir du <strong>${fromISO(PERF_DATE_FROM)}</strong> · délai de traitement & taux qualif/démarrage</div>
+    <div class="kpi-grid" style="margin-bottom:14px">
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${T.n}</div><div class="kpi-label">AO attribués</div><div class="kpi-sub">depuis le ${fromISO(PERF_DATE_FROM)}</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--gray)">${T.delaiMoy!==null?T.delaiMoy+' j':'—'}</div><div class="kpi-label">Délai moy. traitement</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${T.pq>=30?'var(--green)':'var(--amber)'}">${T.pq}%</div><div class="kpi-label">Taux qualif</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${T.pd>=15?'var(--green)':'var(--amber)'}">${T.pd}%</div><div class="kpi-label">Taux démarrage</div></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button class="btn pg-tab" data-g="manager" style="font-size:11px;${tabStyle('manager')}">Par manager</button>
+      <button class="btn pg-tab" data-g="domaine" style="font-size:11px;${tabStyle('domaine')}">Par domaine</button>
+      <button class="btn pg-tab" data-g="client" style="font-size:11px;${tabStyle('client')}">Par client</button>
+    </div>
+    ${cohort.length ? `<div class="card"><div class="card-title">📊 Performance par ${gLabel.toLowerCase()}</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>${gLabel}</th><th style="text-align:center">Nb AO</th><th style="text-align:center">Délai moy.</th><th style="text-align:center">% Qualif</th><th style="text-align:center">% Démarrage</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div></div>`
+    : `<div class="card" style="text-align:center;padding:40px;color:var(--gray)"><div style="font-size:40px;margin-bottom:12px">⏳</div><h3 style="margin-bottom:6px">Aucune attribution depuis le ${fromISO(PERF_DATE_FROM)}</h3><p style="font-size:13px">Ce dashboard se remplira avec les AO que tu attribueras à partir de demain, avec leurs délais de traitement et taux de qualif / démarrage par manager, domaine et client.</p></div>`}
+  `;
+  document.querySelectorAll(".pg-tab").forEach(b=>b.addEventListener("click",()=>{ perfGroup=b.dataset.g; renderEquipePerf(el); }));
 }
 
 // ===================== HISTORIQUE =====================
@@ -2107,7 +2173,7 @@ function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage
 function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
 async function renderHistorique(el) {
   await loadHistoricalAOs();
-  const clientHist = clientAOs(histAOs);
+  const clientHist = clientAOs(histAOs).filter(a => !(a.bm||"").trim()); // comptes = AO sans attribution (les attribués sont dans les vues équipe)
   if (!clientHist.length) {
     el.innerHTML = `
       <h1 style="font-size:24px;font-weight:800;margin-bottom:16px">📊 Dashboard ${clientMeta(selectedClient).label}</h1>
@@ -2384,7 +2450,7 @@ async function renderHistorique(el) {
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <h1 style="font-size:24px;font-weight:800">📊 Dashboard ${clientMeta(selectedClient).label}</h1>
-      <span style="font-size:13px;color:var(--gray)">${clientHist.length} AO</span>
+      <span style="font-size:13px;color:var(--gray)">${clientHist.length} AO sans attribution</span>
     </div>
     <div class="filter-bar" style="margin-bottom:8px">
       <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Tous départements":d}</option>`).join("")}</select>
