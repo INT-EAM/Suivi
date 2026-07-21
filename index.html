@@ -206,13 +206,28 @@ const CLIENTS = [
   { id:"BNP", label:"BNP", source:"PWise / OneProcTool", excluded:["IECC","DIFA","MDEP"], active:true },
   { id:"BPCE", label:"Harmoni", source:"Harmoni RFx", excluded:[], active:true },
   { id:"OBMS", label:"OBMS", source:"OBMS besoins AT", excluded:[], active:true },
+  // Vue équipe : filtre par membre attribué (bm) au lieu de la plateforme
+  { id:"MAS", label:"Équipe MAS", team:[
+      { tri:"OAK", aliases:["oak","akamkam"] },
+      { tri:"CKC", aliases:["ckc","kcharem"] },
+      { tri:"MBNE", aliases:["mbne","bou nasser","nasser eddine"] },
+      { tri:"FZH", aliases:["fzh","zheiman","zeiman"] },
+      { tri:"VBR", aliases:["vbr","brouillard"] },
+    ], active:true },
 ];
 const DEFAULT_CLIENT = "BNP";
 let selectedClient = DEFAULT_CLIENT;
 function clientOf(ao){ return ao.client || DEFAULT_CLIENT; }
 function clientMeta(id){ return CLIENTS.find(c => c.id === id) || CLIENTS[0]; }
 function activeClients(){ return CLIENTS.filter(c => c.active); }
-function clientAOs(list){ return (list||[]).filter(a => clientOf(a) === selectedClient); }
+function clientAOs(list){
+  const meta = clientMeta(selectedClient);
+  if (meta && meta.team){
+    const aliases = meta.team.flatMap(m => m.aliases);
+    return (list||[]).filter(a => { const b = bpceNorm(a.bm); return b && aliases.some(x => b.includes(x)); });
+  }
+  return (list||[]).filter(a => clientOf(a) === selectedClient);
+}
 // ===================== FRAMEWORK BNP × INTM 2026 =====================
 // Grille Schedule 12 — TJM max IDF (€ HT). Hors IDF / full remote = -15%.
 // Source : BNP_INTM_Framework_Segments_2026.xlsx — [code, segment, profil, niveau, expérience, tjmMaxIDF]
