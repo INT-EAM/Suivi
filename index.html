@@ -1181,7 +1181,7 @@ async function renderView() {
     if(currentView==="dashboard") renderDashboard(main);
     else if(currentView==="liste") renderListe(main);
     else if(currentView==="suivi") renderSuivi(main);
-    else if(currentView==="historique") renderHistorique(main);
+    else if(currentView==="historique") { if(clientMeta(selectedClient).team) renderEquipe(main); else renderHistorique(main); }
     else if(currentView==="import") renderImport(main);
     else if(currentView==="export") renderExport(main);
   } catch(e) {
@@ -1997,6 +1997,92 @@ function renderSuivi(el){
   document.getElementById("sf_dem").addEventListener("change",e=>{suiviF.inclureDemarres=e.target.checked;renderSuivi(el);});
   document.querySelectorAll(".suivi-row").forEach(tr=>{
     const open=()=>{ renderDetail(document.getElementById("suivi-detail-area"), tr.dataset.rfc); document.getElementById("suivi-detail-area").scrollIntoView({behavior:"smooth",block:"start"}); };
+    tr.addEventListener("click",open);
+    tr.addEventListener("keydown",e=>{ if(e.key==="Enter") open(); });
+  });
+}
+
+// ===================== VUE ÉQUIPE (backlog en cours par manager) =====================
+let equipeSel = null;
+function teamTri(bm){
+  const meta = clientMeta(selectedClient);
+  if(!meta || !meta.team) return bm||"—";
+  const b = bpceNorm(bm);
+  const m = meta.team.find(mm => mm.aliases.some(x => b.includes(x)));
+  return m ? m.tri : (bm||"—");
+}
+function renderEquipe(el){
+  // AO en cours = attribués à l'équipe, ni clos ni soumis (pas encore répondus)
+  const base = clientAOs(allAOs).filter(a => a.statut!=="clos" && !aReponduAO(a));
+  const byM = {};
+  base.forEach(a => { const k = teamTri(a.bm); (byM[k]=byM[k]||[]).push(a); });
+  const entries = Object.entries(byM).sort((a,b)=>b[1].length-a[1].length);
+  const max = entries.length ? entries[0][1].length : 1;
+  if(equipeSel && !byM[equipeSel]) equipeSel = null;
+  const urgents = base.filter(a => urgency(a.dateDebut)>=2).length;
+  const bars = entries.map(([m,list])=>{
+    const sel = equipeSel===m; const pct = Math.max(Math.round(list.length/max*100), list.length>0?6:0);
+    return `<div class="bar-row equipe-bar" data-m="${escHtml(m)}" tabindex="0" style="cursor:pointer;${sel?'outline:2px solid var(--green);border-radius:6px;':''}">
+      <div class="bar-label" title="${escHtml(m)}" style="width:120px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:0.5px">${escHtml(m)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${sel?'var(--green)':'var(--blue)'}"><span style="font-size:11px;font-weight:700;color:#fff">${list.length}</span></div></div>
+    </div>`;
+  }).join("");
+  let backlog = "";
+  if(equipeSel && byM[equipeSel]){
+    const list = byM[equipeSel];
+    const byClient={}; list.forEach(a=>{ const c=clientOf(a); byClient[c]=(byClient[c]||0)+1; });
+    const clientBadges = Object.entries(byClient).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="badge" style="background:${clientColor(c)}">${escHtml(clientMeta(c).label)}: ${n}</span>`).join(" ");
+    const byCat={}; list.forEach(a=>{ const c=categorize(a.profil); byCat[c]=(byCat[c]||0)+1; });
+    const catBadges = Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([c,n])=>`<span class="badge" style="background:${CAT_COLORS[c]}">${c}: ${n}</span>`).join(" ");
+    const rows = [...list].sort((a,b)=>(parseDate(a.dateDebut)||0)-(parseDate(b.dateDebut)||0)).map(a=>{
+      const cid=clientOf(a), u=urgency(a.dateDebut);
+      return `<tr class="equipe-ao row${u>=2?' urg'+u:''}" data-rfc="${escHtml(a.rfc)}" tabindex="0" style="cursor:pointer">
+        <td><span class="badge" style="background:${clientColor(cid)}">${escHtml(clientMeta(cid).label)}</span></td>
+        <td class="rfc-code">${escHtml(String(a.rfc).replace(/^RFC0+/,''))}</td>
+        <td class="profil-cell" title="${escHtml(a.profil)}">${escHtml(a.profil)}</td>
+        <td>${statutPill(statutComplet(a),a)}</td>
+        <td style="font-size:11.5px">${a.datePrise||'<span class="empty-cell">—</span>'}</td>
+        <td style="font-size:11.5px">${a.dateDebut||'<span class="empty-cell">—</span>'}</td>
+      </tr>`;
+    }).join("");
+    backlog = `<div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📋 Backlog de <strong style="color:var(--green);text-transform:uppercase">${escHtml(equipeSel)}</strong> <span style="font-weight:400;color:var(--gray)">${list.length} AO en cours</span></span>
+        <button class="btn" id="equipe-close" style="font-size:11px;padding:3px 10px">✕ Fermer</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
+        <span style="font-size:11px;color:var(--gray)">Par client :</span> ${clientBadges}
+        <span style="font-size:11px;color:var(--gray);margin-left:10px">Par profil :</span> ${catBadges}
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Client</th><th>RFC</th><th>Profil</th><th>Statut</th><th>Prise en charge</th><th>Échéance</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div id="equipe-detail-area"></div>
+    </div>`;
+  }
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <h1 style="font-size:24px;font-weight:800">🎯 ${escHtml(clientMeta(selectedClient).label)} — backlog en cours</h1>
+      <span style="font-size:13px;color:var(--gray)">ni clos, ni soumis · tous clients</span>
+    </div>
+    <div class="kpi-grid" style="margin-bottom:16px">
+      <div class="kpi"><div class="kpi-value" style="color:var(--blue)">${base.length}</div><div class="kpi-label">AO en cours</div><div class="kpi-sub">à traiter / en attente</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:var(--green)">${entries.length}</div><div class="kpi-label">Managers</div></div>
+      <div class="kpi"><div class="kpi-value" style="color:${urgents?'var(--red)':'var(--green)'}">${urgents}</div><div class="kpi-label">Échéance proche</div></div>
+    </div>
+    ${entries.length ? `<div class="card"><div class="card-title">👥 Charge par manager <span style="font-size:11px;color:var(--text-light);font-weight:400">— cliquez un manager pour voir son backlog</span></div><div class="bar-chart">${bars}</div></div>` : '<div class="card" style="text-align:center;padding:40px;color:var(--gray)"><div style="font-size:40px;margin-bottom:12px">✅</div><h3 style="margin-bottom:6px">Aucun AO en cours</h3><p style="font-size:13px">Rien à traiter pour l\'équipe : tous les AO attribués sont soumis ou clos.</p></div>'}
+    <div id="equipe-backlog">${backlog}</div>
+  `;
+  document.querySelectorAll(".equipe-bar").forEach(b=>{
+    const go=()=>{ const m=b.dataset.m; equipeSel = (equipeSel===m)?null:m; renderEquipe(el); const bl=document.getElementById("equipe-backlog"); if(bl&&equipeSel) bl.scrollIntoView({behavior:"smooth",block:"start"}); };
+    b.addEventListener("click",go);
+    b.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  });
+  const cb=document.getElementById("equipe-close");
+  if(cb) cb.addEventListener("click",()=>{ equipeSel=null; renderEquipe(el); });
+  document.querySelectorAll(".equipe-ao").forEach(tr=>{
+    const open=()=>{ renderDetail(document.getElementById("equipe-detail-area"), tr.dataset.rfc); document.getElementById("equipe-detail-area").scrollIntoView({behavior:"smooth",block:"start"}); };
     tr.addEventListener("click",open);
     tr.addEventListener("keydown",e=>{ if(e.key==="Enter") open(); });
   });
@@ -3035,17 +3121,28 @@ async function seedIfEmpty(){
   console.log("Seed: "+toSave.length+" AO importés ("+EXCLUDED_DOMAINS.join(",")+' exclus)');
 }
 // ===================== SÉLECTEUR CLIENT =====================
+function updateSuiviNav(){
+  // La vue "Suivi AO" n'a pas d'intérêt sur une vue équipe (déjà filtrée par membre) → on la masque
+  const nav = document.querySelector('.nav-item[data-view="suivi"]');
+  if(!nav) return;
+  const isTeam = !!(clientMeta(selectedClient).team);
+  nav.style.display = isTeam ? "none" : "";
+  return isTeam;
+}
 function initClientSelect(){
   const sel = document.getElementById("client-select");
   if(!sel) return;
   sel.innerHTML = activeClients().map(c => `<option value="${c.id}"${c.id===selectedClient?" selected":""}>${c.label}</option>`).join("");
   const lbl = document.getElementById("nav-dash-label");
   if(lbl) lbl.textContent = "Dashboard " + clientMeta(selectedClient).label;
+  updateSuiviNav();
   sel.addEventListener("change", e => {
     selectedClient = e.target.value;
     const l = document.getElementById("nav-dash-label");
     if(l) l.textContent = "Dashboard " + clientMeta(selectedClient).label;
-    renderView();
+    const isTeam = updateSuiviNav();
+    if(isTeam && currentView==="suivi") navigate("historique");   // pas coincé sur une vue masquée
+    else renderView();
   });
 }
 async function init(){
