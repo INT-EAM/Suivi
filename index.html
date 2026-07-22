@@ -199,11 +199,11 @@ button:focus-visible, .nav-item:focus-visible, input:focus-visible, select:focus
 const SUPABASE_URL = "https://tjlrhacczpdtgtiutjlm.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqbHJoYWNjenBkdGd0aXV0amxtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NzcxNTIsImV4cCI6MjA5MTI1MzE1Mn0.iBBvWvBtVHWf6s9eRb1cF9TgDqWBdl_8Bc3y6KH8lA4";
 // Domaines exclus (équipe non utilisatrice de l'outil)
-const EXCLUDED_DOMAINS = ["IECC", "DIFA", "MDEP"];
+const EXCLUDED_DOMAINS = [];
 // ===================== CLIENTS (multi-clients) =====================
 // BNP = client historique. Chaque nouveau client = une entrée ici (active:true).
 const CLIENTS = [
-  { id:"BNP", label:"BNP", source:"PWise / OneProcTool", excluded:["IECC","DIFA","MDEP"], active:true },
+  { id:"BNP", label:"BNP", source:"PWise / OneProcTool", excluded:[], active:true },
   { id:"BPCE", label:"Harmoni", source:"Harmoni RFx", excluded:[], active:true },
   { id:"OBMS", label:"OBMS", source:"OBMS besoins AT", excluded:[], active:true },
   // Vue équipe : filtre par membre attribué (bm) au lieu de la plateforme
@@ -230,6 +230,8 @@ function clientAOs(list){
   if (meta && meta.team) return (list||[]).filter(a => teamMemberOf(a.bm, meta));
   return (list||[]).filter(a => clientOf(a) === selectedClient);
 }
+// Base de travail : vues équipe = dataset complet (inclut historique + domaines exclus, car un AO attribué reste à suivre) ; comptes = périmètre actif
+function baseAOs(){ return (clientMeta(selectedClient).team) ? histAOs : allAOs; }
 // ===================== FRAMEWORK BNP × INTM 2026 =====================
 // Grille Schedule 12 — TJM max IDF (€ HT). Hors IDF / full remote = -15%.
 // Source : BNP_INTM_Framework_Segments_2026.xlsx — [code, segment, profil, niveau, expérience, tjmMaxIDF]
@@ -1147,7 +1149,7 @@ function getDashAOs() {
 }
 function getDashOpenAOs() { return getDashAOs().filter(a => a.statut !== "clos"); }
 function getFilteredAOs() {
-  let f = clientAOs(allAOs);
+  let f = clientAOs(baseAOs());
   if(filters.statut==="clos_nontraite") f=f.filter(a=>a.statut==="clos"&&!hasTraitement(a));
   else if(filters.statut==="clos_traite") f=f.filter(a=>a.statut==="clos"&&hasTraitement(a));
   else if(filters.statut==="clos") f=f.filter(a=>a.statut==="clos");
@@ -1178,7 +1180,8 @@ function navigate(view) {
 async function renderView() {
   try {
     await loadAOs();
-    document.getElementById("nav-count").textContent = clientAOs(getOpenAOs()).length;
+    if(clientMeta(selectedClient).team) await loadHistoricalAOs();
+    document.getElementById("nav-count").textContent = clientAOs(baseAOs().filter(a=>a.statut!=="clos")).length;
     const main = document.getElementById("main-content");
     if(currentView==="dashboard") renderDashboard(main);
     else if(currentView==="liste") renderListe(main);
@@ -1704,7 +1707,7 @@ function renderDashboard(el) {
 }
 // ===================== LISTE AO =====================
 function renderListe(el) {
-  const scope = clientAOs(allAOs);
+  const scope = clientAOs(baseAOs());
   const open = getOpenAOs();
   const depts = ["Tous",...new Set(scope.map(a=>a.dept))];
   const cats = ["Tous",...new Set(scope.map(a=>categorize(a.profil)))];
@@ -1942,8 +1945,9 @@ function renderDetail(el, rfc) {
 // ===================== SUIVI ÉQUIPE (transverse, tous clients) =====================
 let suiviF = { membre:"Tous", client:"Tous", inclureDemarres:false };
 function clientColor(id){ return {BNP:"#00915a", BPCE:"#8b5cf6", OBMS:"#0d9488"}[id] || "#64748b"; }
-function renderSuivi(el){
-  let base = allAOs.filter(a => (a.bm||"").trim() && a.statut!=="clos");
+async function renderSuivi(el){
+  await loadHistoricalAOs();
+  let base = histAOs.filter(a => (a.bm||"").trim() && a.statut!=="clos");
   if(!suiviF.inclureDemarres) base = base.filter(a => !a.dateDemarrage);
   const membres = ["Tous", ...[...new Set(base.map(a=>a.bm))].sort((x,y)=>x.localeCompare(y))];
   const clientsL = ["Tous", ...[...new Set(base.map(a=>clientMeta(clientOf(a)).label))].sort()];
@@ -2015,7 +2019,7 @@ function teamTri(bm){
 }
 function renderEquipeBacklog(el){
   // AO en cours = attribués à l'équipe, ni clos ni soumis (pas encore répondus)
-  const base = clientAOs(allAOs).filter(a => a.statut!=="clos" && !aReponduAO(a));
+  const base = clientAOs(histAOs).filter(a => a.statut!=="clos" && !aReponduAO(a));
   const byM = {};
   base.forEach(a => { const k = teamTri(a.bm); (byM[k]=byM[k]||[]).push(a); });
   const entries = Object.entries(byM).sort((a,b)=>b[1].length-a[1].length);
@@ -2104,7 +2108,7 @@ function renderEquipe(el){
 }
 // Dashboard performance : AO attribués à partir de PERF_DATE_FROM — délais + % qualif/démarrage
 function renderEquipePerf(el){
-  const cohort = clientAOs(allAOs).filter(a => a.datePrise && normDate(a.datePrise) >= PERF_DATE_FROM);
+  const cohort = clientAOs(histAOs).filter(a => a.datePrise && normDate(a.datePrise) >= PERF_DATE_FROM);
   const keyFn = perfGroup==="manager" ? (a=>teamTri(a.bm))
               : perfGroup==="domaine" ? (a=>domainGroup(a.org)||"—")
               : (a=>clientMeta(clientOf(a)).label);
@@ -2732,6 +2736,7 @@ async function syncAOs(parsed, { mode = 'pwise', logImport = false } = {}) {
       const changed = ex.profil !== p.profil || ex.nbJours !== p.nbJours || ex.dateDebut !== p.dateDebut;
       toSave.push({
         ...ex, ...p, statut:"ouvert", dateCloture:"", dateDisparition:"", dernierImport: today(),
+        isHistorique: !inPerimeter, // ré-évalue le périmètre : un AO redevenu dans le périmètre est réactivé
         bm: ex.bm||"", datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"", aRepondu: ex.aRepondu||false,
         consultant: ex.consultant||"", tjm: ex.tjm||"", dateQualif: ex.dateQualif||"",
         dateDemarrage: ex.dateDemarrage||"", notes: ex.notes||"",
