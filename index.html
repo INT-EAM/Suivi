@@ -2159,7 +2159,14 @@ function renderEquipePerf(el){
 }
 
 // ===================== HISTORIQUE =====================
-let histF = { dept: "Tous", cat: "Tous", statut: "Tous", statutAO: "Tous", domain: "Tous", statutPwise: "Tous" };
+let histF = { dept: "Tous", cat: "Tous", statut: "Tous", statutAO: "Tous", attrib: "non", domain: "Tous", statutPwise: "Tous" };
+// Réinitialise tous les filtres (appelé au changement de client — les filtres d'un client n'ont pas de sens sur un autre)
+function resetFilters(){
+  histF = { dept:"Tous", cat:"Tous", statut:"Tous", statutAO:"Tous", attrib:"non", domain:"Tous", statutPwise:"Tous" };
+  filters = { search:"", dept:"Tous", cat:"Tous", statut:"Tous", period:"all", bm:"Tous" };
+  suiviF = { membre:"Tous", client:"Tous", inclureDemarres:false };
+  equipeSel = null; equipeView = "backlog"; perfGroup = "manager"; selectedRFC = null;
+}
 function suiviFromPwise(sp) {
   if (!sp) return "encours";
   if (/non retenu/i.test(sp)) return "clos";
@@ -2177,7 +2184,10 @@ function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage
 function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
 async function renderHistorique(el) {
   await loadHistoricalAOs();
-  const clientHist = clientAOs(histAOs).filter(a => !(a.bm||"").trim()); // comptes = AO sans attribution (les attribués sont dans les vues équipe)
+  const clientHist = clientAOs(histAOs).filter(a => {
+    const has = !!(a.bm||"").trim();
+    return histF.attrib==="oui" ? has : histF.attrib==="non" ? !has : true;
+  });
   if (!clientHist.length) {
     el.innerHTML = `
       <h1 style="font-size:24px;font-weight:800;margin-bottom:16px">📊 Dashboard ${clientMeta(selectedClient).label}</h1>
@@ -2454,7 +2464,7 @@ async function renderHistorique(el) {
   el.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
       <h1 style="font-size:24px;font-weight:800">📊 Dashboard ${clientMeta(selectedClient).label}</h1>
-      <span style="font-size:13px;color:var(--gray)">${clientHist.length} AO sans attribution</span>
+      <span style="font-size:13px;color:var(--gray)">${clientHist.length} AO${histF.attrib==="non"?" sans attribution":histF.attrib==="oui"?" attribués":""}</span>
     </div>
     <div class="filter-bar" style="margin-bottom:8px">
       <select id="hf_dept">${depts.map(d=>`<option value="${d}"${histF.dept===d?" selected":""}>${d==="Tous"?"Tous départements":d}</option>`).join("")}</select>
@@ -2470,6 +2480,11 @@ async function renderHistorique(el) {
         <option value="Tous"${histF.statutAO==="Tous"?" selected":""}>Ouverts + Clos</option>
         <option value="ouvert"${histF.statutAO==="ouvert"?" selected":""}>🟩 Ouverts (à la saisie)</option>
         <option value="clos"${histF.statutAO==="clos"?" selected":""}>⬛ Clos</option>
+      </select>
+      <select id="hf_attrib">
+        <option value="non"${histF.attrib==="non"?" selected":""}>👤 Non attribués</option>
+        <option value="oui"${histF.attrib==="oui"?" selected":""}>✅ Attribués</option>
+        <option value="tous"${histF.attrib==="tous"?" selected":""}>Attribués + non</option>
       </select>
     </div>
     ${tagsHtml}
@@ -2656,6 +2671,7 @@ async function renderHistorique(el) {
   document.getElementById("hf_cat").addEventListener("change",  e => { histF.cat  = e.target.value; renderHistorique(el); });
   document.getElementById("hf_statut").addEventListener("change", e => { histF.statut = e.target.value; renderHistorique(el); });
   document.getElementById("hf_statutao").addEventListener("change", e => { histF.statutAO = e.target.value; renderHistorique(el); });
+  document.getElementById("hf_attrib").addEventListener("change", e => { histF.attrib = e.target.value; renderHistorique(el); });
   // Clics sur barres / lignes → filtre + liste
   document.querySelectorAll(".hist-click").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -3215,6 +3231,7 @@ function initClientSelect(){
   updateSuiviNav();
   sel.addEventListener("change", e => {
     selectedClient = e.target.value;
+    resetFilters();
     const l = document.getElementById("nav-dash-label");
     if(l) l.textContent = "Dashboard " + clientMeta(selectedClient).label;
     const isTeam = updateSuiviNav();
