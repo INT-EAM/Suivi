@@ -2871,7 +2871,7 @@ async function importClientAOs(parsed, clientId, { logImport = false } = {}) {
     else {
       // MAJ des infos Harmoni + préservation du suivi manuel
       toSave.push({ ...ex, ...p, client: clientId,
-        bm: ex.bm||"", consultant: ex.consultant||"", tjm: ex.tjm||"", notes: ex.notes||"",
+        bm: ex.bm || p.bm || "", consultant: ex.consultant||"", tjm: ex.tjm||"", notes: ex.notes||"",
         datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"", dateQualif: ex.dateQualif||"",
         dateDemarrage: ex.dateDemarrage||"", aRepondu: ex.aRepondu||false,
         dateOuverture: ex.dateOuverture || p.dateOuverture, dateCreation: ex.dateCreation || p.dateCreation,
