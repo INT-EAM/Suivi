@@ -3052,10 +3052,11 @@ function renderExport(el) {
     <h1 style="font-size:24px;font-weight:800;margin-bottom:20px">Export</h1>
     <div class="card">
       <div class="card-title">📤 Exporter les données</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Exportez l'intégralité des AOs — dashboard + historique (clôturés, archivés, domaines hors périmètre) — au format CSV ou JSON. Une colonne "Historique" distingue les AOs archivés.</p>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-green" onclick="doExportCSV()">📥 Export CSV</button>
-        <button class="btn" onclick="doExportJSON()">📥 Export JSON (sauvegarde)</button>
+      <p style="font-size:13px;color:var(--gray);margin-bottom:16px">L'export CSV est <strong>scopé sur le client sélectionné</strong> (${escHtml(clientMeta(selectedClient).label)}) et inclut une colonne « Client ». La sauvegarde JSON reste <strong>complète (tous clients)</strong>, nécessaire à la restauration.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-green" onclick="doExportCSV(true)">📥 Export CSV — ${escHtml(clientMeta(selectedClient).label)}</button>
+        <button class="btn" onclick="doExportCSV(false)">📥 Export CSV — tous clients</button>
+        <button class="btn" onclick="doExportJSON()">💾 Sauvegarde complète (JSON)</button>
         <label class="btn" style="cursor:pointer">📎 Restaurer JSON <input type="file" accept=".json" style="display:none" onchange="doImportJSON(event)"></label>
       </div>
     </div>
@@ -3134,7 +3135,7 @@ function renderExport(el) {
 }
 // Jeu de données complet pour l'export : dashboard + historique, dédupliqué par RFC.
 // histAOs est chargé à la demande → on le charge si nécessaire avant d'exporter.
-async function getExportAOs(){
+async function getExportAOs(scoped){
   if(histAOs.length===0){
     try{ await loadHistoricalAOs(); }
     catch(e){ console.warn("Export : historique non chargé —", e); }
@@ -3142,21 +3143,23 @@ async function getExportAOs(){
   const seen={}, out=[];
   allAOs.forEach(a=>{ if(a.rfc&&!seen[a.rfc]){ seen[a.rfc]=1; out.push(a); } });
   histAOs.forEach(a=>{ if(a.rfc&&!seen[a.rfc]){ seen[a.rfc]=1; out.push(a); } });
-  return out;
+  return scoped ? clientAOs(out) : out;
 }
-async function doExportCSV(){
-  const aos=await getExportAOs();
+async function doExportCSV(scoped=true){
+  const aos=await getExportAOs(scoped);
   const dashRfc={};
   allAOs.forEach(a=>{ dashRfc[a.rfc]=1; });
-  let csv="RFC;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Code framework;TJM max grille;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
+  let csv="RFC;Client;TM;Profil;Catégorie;Intitulé;Organisation;Département;Modalité;Date ouverture;Début;Fin;Jours;Statut PWise;BM;Date prise;Date réponse;Consultant;TJM;Code framework;TJM max grille;Qualif;Date qualif;Démarrage;Date démarrage;Notes;Statut suivi;Statut AO;Historique\n";
   aos.forEach(a=>{
     const ss=statutComplet(a);
-    csv+=`${a.rfc};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${gridEffective(a)||""};${gridMax(a,gridEffective(a))??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
+    csv+=`${a.rfc};${clientMeta(clientOf(a)).label};${a.tm};${(a.profil||"").replace(/;/g,",")};${categorize(a.profil)};${(a.intitule||"").replace(/;/g,",")};${(a.org||"").replace(/;/g,",")};${a.dept};${a.modalite};${a.dateOuverture||a.dateCreation||""};${a.dateDebut};${a.dateFin};${a.nbJours};${a.statutPwise};${a.bm||""};${a.datePrise||""};${a.dateReponse||""};${a.consultant||""};${a.tjm||""};${gridEffective(a)||""};${gridMax(a,gridEffective(a))??""};${a.dateQualif?"Oui":"Non"};${a.dateQualif||""};${a.dateDemarrage?"Oui":"Non"};${a.dateDemarrage||""};${(a.notes||"").replace(/;/g,",").replace(/\n/g," ")};${statutLabel(ss)};${a.statut};${dashRfc[a.rfc]?"Non":"Oui"}\n`;
   });
-  download("ao_bcef_export.csv", "﻿"+csv, "text/csv;charset=utf-8;");
+  const cl=clientMeta(selectedClient).label;
+  const suffix = scoped ? cl.normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"_") : "tous_clients";
+  download("ao_"+suffix+"_export.csv", "﻿"+csv, "text/csv;charset=utf-8;");
 }
 async function doExportJSON(){
-  const aos=await getExportAOs();
+  const aos=await getExportAOs(false);
   const data = {version:1, exportDate:new Date().toISOString(), aos:aos};
   download("ao_bcef_backup.json", JSON.stringify(data,null,2), "application/json");
 }
