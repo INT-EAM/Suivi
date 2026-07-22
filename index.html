@@ -2853,7 +2853,10 @@ async function importClientAOs(parsed, clientId, { logImport = false } = {}) {
         bm: ex.bm||"", consultant: ex.consultant||"", tjm: ex.tjm||"", notes: ex.notes||"",
         datePrise: ex.datePrise||"", dateReponse: ex.dateReponse||"", dateQualif: ex.dateQualif||"",
         dateDemarrage: ex.dateDemarrage||"", aRepondu: ex.aRepondu||false,
-        dateOuverture: ex.dateOuverture || p.dateOuverture, dateCreation: ex.dateCreation || p.dateCreation });
+        dateOuverture: ex.dateOuverture || p.dateOuverture, dateCreation: ex.dateCreation || p.dateCreation,
+        // Clôture "collante" : une fermeture (manuelle OU source) n'est jamais rouverte par un ré-import
+        statut: (ex.statut==="clos" || p.statut==="clos") ? "clos" : "ouvert",
+        dateCloture: ex.dateCloture || p.dateCloture || "" });
       c.updated++;
     }
   });
