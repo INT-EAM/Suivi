@@ -2923,15 +2923,85 @@ function obmsToAOs(rows){
   return out;
 }
 // ── (S) Rendu UI — séparé de la logique métier ──
-function renderImport(el) {
+// ── Détection automatique de la source d'un fichier d'import ──
+function detectImportSource(fileName, text, xlsxRows){
+  if(xlsxRows){
+    const aos=obmsToAOs(xlsxRows);
+    return { src:"OBMS — besoins AT (.xlsx)", client:"OBMS", color:"#0d9488", aos, note:"besoins reçus en 2026",
+             run:()=>importClientAOs(aos,"OBMS",{logImport:true}) };
+  }
+  let data=null; try{ data=JSON.parse(text); }catch(e){}
+  if(data && typeof data==="object"){
+    if(Array.isArray(data.dossiers) || (Array.isArray(data.aos)&&data.source==="harmoni-bpce")){
+      const aos=harmoniToAOs(data);
+      return { src:"Harmoni — RFx (.json)", client:"BPCE", color:"#8b5cf6", aos, note:"dossiers Harmoni",
+               run:()=>importClientAOs(aos,"BPCE",{logImport:true}) };
+    }
+    if(Array.isArray(data.aos)&&data.source==="obms-bpce"){
+      return { src:"OBMS (.json)", client:"OBMS", color:"#0d9488", aos:data.aos,
+               run:()=>importClientAOs(data.aos,"OBMS",{logImport:true}) };
+    }
+    if(Array.isArray(data.aos)){
+      return { src:"PWise / BNP — bookmarklet (.json)", client:"BNP", color:"#00915a", aos:data.aos, note:"synchronisation des statuts",
+               run:()=>syncAOs(data.aos,{mode:'json'}) };
+    }
+  }
+  const parsed=parseAOs(text||"");
+  if(parsed.length){
+    return { src:"PWise / BNP — texte", client:"BNP", color:"#00915a", aos:parsed, note:"encours actifs", isPwise:true,
+             run:(mode)=>syncAOs(parsed,{mode:mode||'pwise',logImport:true}) };
+  }
+  return null;
+}
+function importWarn(msg){ return '<div class="import-warn" style="margin-top:12px">⚠️ '+msg+'</div>'; }
+// Aperçu + confirmation avant d'écrire (contrôle : rien n'est importé tant que ce n'est pas validé)
+function showImportPreview(det, container){
+  const cl=clientMeta(det.client).label;
+  container.innerHTML = `
+    <div class="card" style="margin-top:12px;border-left:4px solid ${det.color}">
+      <div style="font-size:14px;font-weight:700;margin-bottom:10px">🔎 Fichier détecté — à confirmer</div>
+      <div style="font-size:13px;color:var(--gray);margin-bottom:4px">Source : <strong style="color:${det.color}">${escHtml(det.src)}</strong></div>
+      <div style="font-size:13px;color:var(--gray);margin-bottom:4px">Destination : client <strong>${escHtml(cl)}</strong>${det.note?" · "+escHtml(det.note):""}</div>
+      <div style="font-size:13px;color:var(--gray);margin-bottom:12px">Contenu : <strong>${det.aos.length}</strong> AO / besoins</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-green import-confirm">✅ Confirmer l'import vers ${escHtml(cl)}</button>
+        <button class="btn import-cancel">✕ Annuler</button>
+      </div>
+      <div class="import-final"></div>
+    </div>`;
+  const final=container.querySelector(".import-final");
+  container.querySelector(".import-cancel").addEventListener("click",()=>{ container.innerHTML=""; });
+  container.querySelector(".import-confirm").addEventListener("click", async ev=>{
+    const btn=ev.target; btn.textContent="⏳ Import en cours..."; btn.disabled=true;
+    try{
+      const c=await det.run(det._mode);
+      const added=(c.added!=null)?c.added:((c.addedDash||0)+(c.addedHist||0));
+      const updated=c.updated||0, closed=c.closed||0;
+      final.innerHTML='<div class="import-ok" style="margin-top:12px">✅ <strong>Import réussi</strong> — '+det.aos.length+' traités'
+        +(added?(' · 🆕 '+added+' nouveaux'):'')+(updated?(' · ♻️ '+updated+' mis à jour'):'')+(closed?(' · ⚫ '+closed+' clos'):'')
+        +'<br><span style="font-size:12px">→ <a href="#" onclick="selectedClient=\''+det.client+'\';initClientSelect();navigate(\'historique\');return false;" style="color:var(--green);font-weight:600">Voir le Dashboard '+escHtml(clientMeta(det.client).label)+'</a></span></div>';
+      btn.style.display="none"; container.querySelector(".import-cancel").textContent="Fermer";
+      loadImportHistory();
+    }catch(err){ final.innerHTML=importWarn("Erreur : "+escHtml(err.message)); btn.disabled=false; btn.textContent="✅ Confirmer l'import"; }
+  });
+}
+function renderImport(el){
   el.innerHTML = `
     <h1 style="font-size:24px;font-weight:800;margin-bottom:8px">Import des fichiers</h1>
-    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">
-      Importez les AOs depuis PWise — texte copié, fichier .txt ou fichier .json (bookmarklet).
-    </p>
+    <p style="font-size:13px;color:var(--gray);margin-bottom:20px">Déposez n'importe quel export — l'outil <strong>détecte la source</strong> (PWise/BNP, Harmoni, OBMS), affiche un <strong>aperçu à valider</strong>, puis l'importe vers le bon client. Impossible de se tromper de client : la destination vient du fichier, pas de la vue affichée.</p>
     <div class="card">
-      <div class="card-title">📥 Importer des AOs</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="card-title">📥 Importer un fichier</div>
+      <p style="font-size:12px;color:var(--gray);margin-bottom:12px">Formats acceptés : PWise <code>.txt</code> ou <code>.json</code>, Harmoni <code>.json</code>, OBMS <code>.xlsx</code>.</p>
+      <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+        📂 Choisir un fichier
+        <input type="file" id="uni-file" accept=".txt,.text,.json,.xlsx,.xls" style="display:none">
+      </label>
+      <span id="uni-info" style="font-size:11px;color:var(--gray);margin-left:8px"></span>
+      <div id="uni-preview"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 Coller le texte PWise (BNP)</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;padding:6px 12px;border-radius:8px;border:2px solid var(--green);background:#f0fdf4;font-weight:600;color:var(--green)">
           <input type="radio" name="import-mode" value="pwise" checked style="accent-color:var(--green)"> 🔄 Encours actifs
         </label>
@@ -2939,122 +3009,40 @@ function renderImport(el) {
           <input type="radio" name="import-mode" value="historique" style="accent-color:var(--blue)"> 📈 Historique global
         </label>
       </div>
-      <textarea id="import-text" style="width:100%;height:180px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le texte PWise ou le contenu d'un fichier .txt..."></textarea>
-      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-green" id="run-import">🚀 Lancer l'import</button>
-        <span style="color:var(--gray);font-size:12px">ou charger :</span>
-        <label class="btn" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          📄 Fichier .txt
-          <input type="file" id="import-file" accept=".txt,.text" style="display:none">
-        </label>
-        <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-          📦 Fichier .json (bookmarklet)
-          <input type="file" id="json-sync-file" accept=".json" style="display:none">
-        </label>
-        <span id="import-file-info" style="font-size:11px;color:var(--gray)"></span>
-      </div>
+      <textarea id="import-text" style="width:100%;height:150px;border:1px solid #d1d5db;border-radius:8px;padding:12px;font-size:12px;font-family:'Cascadia Code',monospace;resize:vertical;outline:none" placeholder="Collez ici le texte PWise..."></textarea>
+      <button class="btn btn-green" id="run-import" style="margin-top:10px">🔎 Analyser</button>
       <div id="import-result"></div>
-    </div>
-    <div class="card" style="border-left:4px solid #6d28d9">
-      <div class="card-title">📦 Import BPCE (Harmoni)</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Déposez l'export Harmoni brut (<code>harmoni_export_*.json</code>). Les dossiers sont ajoutés / mis à jour côté client <strong>BPCE</strong> sans toucher aux AO BNP. Le suivi saisi manuellement est préservé.</p>
-      <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-        📥 Charger l'export Harmoni (.json)
-        <input type="file" id="bpce-file" accept=".json" style="display:none">
-      </label>
-      <span id="bpce-file-info" style="font-size:11px;color:var(--gray);margin-left:8px"></span>
-      <div id="bpce-result"></div>
-    </div>
-    <div class="card" style="border-left:4px solid #0d9488">
-      <div class="card-title">📦 Import OBMS (besoins AT)</div>
-      <p style="font-size:13px;color:var(--gray);margin-bottom:12px">Déposez l'export OBMS brut (<code>.xlsx</code>). Seuls les besoins <strong>reçus en 2026</strong> sont intégrés, côté client <strong>OBMS</strong> (tous en « ouvert »). Le suivi manuel est préservé.</p>
-      <label class="btn btn-green" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
-        📥 Charger l'export OBMS (.xlsx)
-        <input type="file" id="obms-file" accept=".xlsx,.xls" style="display:none">
-      </label>
-      <span id="obms-file-info" style="font-size:11px;color:var(--gray);margin-left:8px"></span>
-      <div id="obms-result"></div>
     </div>
     <div id="import-history"></div>
   `;
-  // Charger .txt → coller dans textarea
-  document.getElementById("import-file").addEventListener("change", async e => {
-    const file = e.target.files[0]; if (!file) return;
-    document.getElementById("import-text").value = await readFile(file);
-    document.getElementById("import-file-info").textContent = `📄 ${file.name}`;
-  });
-  // Charger .json → sync directe
-  document.getElementById("json-sync-file").addEventListener("change", async e => {
-    const file = e.target.files[0]; if (!file) return;
-    const info   = document.getElementById("import-file-info");
-    const result = document.getElementById("import-result");
-    info.textContent = `⏳ Lecture ${file.name}...`;
-    result.innerHTML = "";
-    try {
-      const data = JSON.parse(await readFile(file));
-      if (!data.aos?.length) { alert("Fichier JSON invalide ou vide."); info.textContent = ""; return; }
-      info.textContent = `${data.aos.length} AOs trouvés — sync en cours...`;
-      const c = await syncAOs(data.aos, { mode: 'json' });
-      result.innerHTML = formatSyncResult(c, "Sync JSON terminée", data.extractDate?.slice(0,10));
-      info.textContent = `✅ ${file.name}`;
-      loadImportHistory();
-    } catch(err) { alert("Erreur : " + err.message); info.textContent = ""; }
-  });
-  // Lancer import texte
-  document.getElementById("run-import").addEventListener("click", async () => {
-    const raw  = document.getElementById("import-text").value.trim();
-    const mode = document.querySelector('input[name="import-mode"]:checked').value;
-    if (!raw) { alert("Collez d'abord du texte ou chargez un fichier .txt."); return; }
-    const parsed = parseAOs(raw);
-    if (!parsed.length) {
-      document.getElementById("import-result").innerHTML =
-        `<div class="import-warn" style="margin-top:16px">⚠️ Aucun AO détecté. Vérifiez le format du texte.</div>`;
-      return;
-    }
-    const btn = document.getElementById("run-import");
-    btn.textContent = "⏳ Import en cours..."; btn.disabled = true;
-    const c = await syncAOs(parsed, { mode, logImport: mode === 'pwise' });
-    btn.textContent = "🚀 Lancer l'import"; btn.disabled = false;
-    document.getElementById("import-result").innerHTML = formatSyncResult(c,
-      mode === 'historique' ? "Import Historique terminé" : "Import PWise réussi !");
-    loadImportHistory();
-  });
-  // ── Import BPCE (Harmoni) ──
-  const bpceInput=document.getElementById("bpce-file");
-  if(bpceInput) bpceInput.addEventListener("change", async e=>{
+  document.getElementById("uni-file").addEventListener("change", async e=>{
     const file=e.target.files[0]; if(!file) return;
-    const info=document.getElementById("bpce-file-info");
-    const res=document.getElementById("bpce-result");
-    info.textContent="⏳ Lecture "+file.name+"...";
+    const info=document.getElementById("uni-info"), prev=document.getElementById("uni-preview");
+    info.textContent="⏳ Analyse "+file.name+"..."; prev.innerHTML="";
     try{
-      const data=JSON.parse(await readFile(file));
-      const parsed=harmoniToAOs(data);
-      if(!parsed.length){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Aucun dossier BPCE détecté dans ce fichier.</div>'; info.textContent=""; return; }
-      const c=await importClientAOs(parsed,"BPCE",{logImport:true});
-      res.innerHTML='<div class="import-ok" style="margin-top:12px">✅ <strong>Import BPCE réussi</strong> — 🆕 '+c.added+' nouveaux · ♻️ '+c.updated+' mis à jour ('+parsed.length+' dossiers)<br><span style="font-size:12px">→ <a href="#" onclick="selectedClient=\'BPCE\';initClientSelect();navigate(\'historique\');return false;" style="color:var(--green);font-weight:600">Voir le Dashboard BPCE</a></span></div>';
-      info.textContent="✅ "+file.name;
-      loadImportHistory();
-    }catch(err){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Erreur : '+escHtml(err.message)+'</div>'; info.textContent=""; }
+      const fn=file.name.toLowerCase(); let det=null;
+      if(fn.endsWith(".xlsx")||fn.endsWith(".xls")){
+        if(typeof XLSX==="undefined"){ prev.innerHTML=importWarn("Librairie Excel non chargée — vérifiez la connexion et réessayez."); info.textContent=""; return; }
+        const buf=await file.arrayBuffer();
+        const wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
+        const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
+        det=detectImportSource(fn,"",rows);
+      } else {
+        det=detectImportSource(fn, await readFile(file), null);
+      }
+      info.textContent=file.name;
+      if(!det || !det.aos.length){ prev.innerHTML=importWarn("Fichier non reconnu ou vide. Vérifiez qu'il s'agit d'un export PWise / Harmoni / OBMS."); return; }
+      showImportPreview(det, prev);
+    }catch(err){ prev.innerHTML=importWarn("Erreur : "+escHtml(err.message)); info.textContent=""; }
   });
-  // ── Import OBMS (besoins AT) ──
-  const obmsInput=document.getElementById("obms-file");
-  if(obmsInput) obmsInput.addEventListener("change", async e=>{
-    const file=e.target.files[0]; if(!file) return;
-    const info=document.getElementById("obms-file-info"), res=document.getElementById("obms-result");
-    if(typeof XLSX==="undefined"){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Librairie de lecture Excel non chargée — vérifiez la connexion et réessayez.</div>'; return; }
-    info.textContent="⏳ Lecture "+file.name+"...";
-    try{
-      const buf=await file.arrayBuffer();
-      const wb=XLSX.read(new Uint8Array(buf),{type:"array",cellDates:true});
-      const ws=wb.Sheets[wb.SheetNames[0]];
-      const rows=XLSX.utils.sheet_to_json(ws,{defval:""});
-      const parsed=obmsToAOs(rows);
-      if(!parsed.length){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Aucun besoin reçu en 2026 détecté dans ce fichier.</div>'; info.textContent=""; return; }
-      const c=await importClientAOs(parsed,"OBMS",{logImport:true});
-      res.innerHTML='<div class="import-ok" style="margin-top:12px">✅ <strong>Import OBMS réussi</strong> — 🆕 '+c.added+' nouveaux · ♻️ '+c.updated+' mis à jour ('+parsed.length+' besoins 2026)<br><span style="font-size:12px">→ <a href="#" onclick="selectedClient=\'OBMS\';initClientSelect();navigate(\'historique\');return false;" style="color:var(--green);font-weight:600">Voir le Dashboard OBMS</a></span></div>';
-      info.textContent="✅ "+file.name;
-      loadImportHistory();
-    }catch(err){ res.innerHTML='<div class="import-warn" style="margin-top:12px">⚠️ Erreur : '+escHtml(err.message)+'</div>'; info.textContent=""; }
+  document.getElementById("run-import").addEventListener("click", ()=>{
+    const raw=document.getElementById("import-text").value.trim();
+    const prev=document.getElementById("import-result");
+    if(!raw){ prev.innerHTML=importWarn("Collez d'abord le texte PWise."); return; }
+    const det=detectImportSource("paste.txt", raw, null);
+    if(!det || !det.aos.length){ prev.innerHTML=importWarn("Aucun AO détecté dans le texte."); return; }
+    det._mode=document.querySelector('input[name="import-mode"]:checked').value;
+    showImportPreview(det, prev);
   });
   loadImportHistory();
 }
