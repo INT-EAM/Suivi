@@ -2718,12 +2718,12 @@ async function seedIfEmpty(){
 }
 // ===================== SÉLECTEUR CLIENT =====================
 function updateSuiviNav(){
-  // La vue "Suivi AO" n'a pas d'intérêt sur une vue équipe (déjà filtrée par membre) → on la masque
+  // Le "Suivi AO" n'a de sens que pour OBMS → masqué pour BNP, Harmoni et les vues équipe
   const nav = document.querySelector('.nav-item[data-view="suivi"]');
-  if(!nav) return;
-  const isTeam = !!(clientMeta(selectedClient).team);
-  nav.style.display = isTeam ? "none" : "";
-  return isTeam;
+  if(!nav) return true;
+  const hidden = (selectedClient !== "OBMS");
+  nav.style.display = hidden ? "none" : "";
+  return hidden;
 }
 function initClientSelect(){
   const sel = document.getElementById("client-select");
@@ -2737,8 +2737,8 @@ function initClientSelect(){
     resetFilters();
     const l = document.getElementById("nav-dash-label");
     if(l) l.textContent = "Dashboard " + clientMeta(selectedClient).label;
-    const isTeam = updateSuiviNav();
-    if(isTeam && currentView==="suivi") navigate("historique");   // pas coincé sur une vue masquée
+    const hidden = updateSuiviNav();
+    if(hidden && currentView==="suivi") navigate("historique");   // pas coincé sur une vue masquée
     else renderView();
   });
 }
