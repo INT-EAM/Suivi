@@ -1683,6 +1683,9 @@ function aReponduAO(a) {
 }
 function estRetenuAO(a)    { return suiviFromPwise(a.statutPwise) === "demarrage" || !!a.dateDemarrage; }
 function estNonRetenuAO(a) { return suiviFromPwise(a.statutPwise) === "clos"; }
+// Axe CONSULTATION dérivé : une décision (retenu OU non retenu) ferme la consultation "par définition",
+// au même titre qu'une clôture manuelle/source. Seuls "en cours" et "soumis" restent ouverts à la saisie.
+function consultationClose(a){ return a.statut === "clos" || estRetenuAO(a) || estNonRetenuAO(a); }
 async function renderHistorique(el) {
   await loadHistoricalAOs();
   const clientHist = clientAOs(histAOs).filter(a => {
@@ -1708,7 +1711,7 @@ async function renderHistorique(el) {
   if (histF.domain !== "Tous") f = f.filter(a => domainGroup(a.org) === histF.domain);
   if (histF.cat  !== "Tous") f = f.filter(a => categorize(a.profil) === histF.cat);
   if (histF.statutPwise !== "Tous") f = f.filter(a => (a.statutPwise||"—") === histF.statutPwise);
-  if (histF.statutAO !== "Tous") f = f.filter(a => (a.statut === "clos" ? "clos" : "ouvert") === histF.statutAO);
+  if (histF.statutAO !== "Tous") f = f.filter(a => (consultationClose(a) ? "clos" : "ouvert") === histF.statutAO);
   if (histF.statut !== "Tous") {
     if (histF.statut === "demarrage") f = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage");
     else if (histF.statut === "clos") f = f.filter(a => suiviFromPwise(a.statutPwise) === "clos");
@@ -1716,8 +1719,8 @@ async function renderHistorique(el) {
     else if (histF.statut === "encours") f = f.filter(a => suiviFromPwise(a.statutPwise) === "encours");
   }
   const total     = f.length;
-  const nbOuvertAO = clientHist.filter(a => a.statut !== "clos").length;
-  const nbClosAO   = clientHist.filter(a => a.statut === "clos").length;
+  const nbOuvertAO = clientHist.filter(a => !consultationClose(a)).length;
+  const nbClosAO   = clientHist.filter(a => consultationClose(a)).length;
   // Phrase décrivant la typologie d'AO affichée selon les filtres actifs
   const selBits = [];
   selBits.push(histF.attrib==="non" ? "non attribués" : histF.attrib==="oui" ? "attribués" : "attribués + non attribués");
@@ -2228,7 +2231,7 @@ function buildNewAO(p, { isHistorique = false } = {}) {
 // ── (O) Règles de statut PWise — données extensibles ──
 const PWISE_STATUS_RULES = [
   { test: sp => /non retenu/i.test(sp),   apply: ()  => ({ statut:"clos", dateCloture: today(), aRepondu:true }) },
-  { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => ({ aRepondu:true, ...(ao.dateDemarrage ? {} : { dateDemarrage: today() }) }) },
+  { test: sp => /^RFC retenu$/i.test(sp), apply: ao  => ({ aRepondu:true, statut:"clos", dateCloture: ao.dateCloture||today(), ...(ao.dateDemarrage ? {} : { dateDemarrage: today() }) }) },
   { test: sp => /soumis/i.test(sp),       apply: ao  => ({ aRepondu:true, ...(ao.dateReponse   ? {} : { dateReponse:  today() }) }) },
 ];
 // ── (S) Application des règles — isolée du reste ──
