@@ -2217,6 +2217,16 @@ async function renderHistorique(el) {
   const total     = f.length;
   const nbOuvertAO = clientHist.filter(a => a.statut !== "clos").length;
   const nbClosAO   = clientHist.filter(a => a.statut === "clos").length;
+  // Phrase décrivant la typologie d'AO affichée selon les filtres actifs
+  const selBits = [];
+  selBits.push(histF.attrib==="non" ? "non attribués" : histF.attrib==="oui" ? "attribués" : "attribués + non attribués");
+  if(histF.statutAO!=="Tous") selBits.push(histF.statutAO==="clos" ? "consultation close" : "ouverts à la saisie");
+  if(histF.statut!=="Tous") selBits.push({demarrage:"retenus",repondu:"soumis",clos:"non retenus",encours:"en cours de réponse"}[histF.statut]||histF.statut);
+  if(histF.statutPwise!=="Tous") selBits.push("statut PWise « "+histF.statutPwise+" »");
+  if(histF.dept!=="Tous") selBits.push("département "+histF.dept);
+  if(histF.domain!=="Tous") selBits.push("domaine "+histF.domain);
+  if(histF.cat!=="Tous") selBits.push("profil "+histF.cat);
+  const selLabel = selBits.join(" · ");
   const retenus   = f.filter(a => suiviFromPwise(a.statutPwise) === "demarrage").length;
   const nonRetenus= f.filter(a => suiviFromPwise(a.statutPwise) === "clos").length;
   const encours   = f.filter(a => suiviFromPwise(a.statutPwise) === "encours").length;
@@ -2487,6 +2497,7 @@ async function renderHistorique(el) {
         <option value="tous"${histF.attrib==="tous"?" selected":""}>Attribués + non</option>
       </select>
     </div>
+    <div style="font-size:12.5px;color:#334155;margin:2px 0 14px;padding:9px 13px;background:var(--gray-light);border-radius:8px">📋 <strong>${total} AO</strong> ${escHtml(clientMeta(selectedClient).label)} affiché${total>1?"s":""} — ${escHtml(selLabel)}</div>
     ${tagsHtml}
     <div class="kpi-grid" style="margin-bottom:20px">
       <div class="kpi hist-click" data-key="statut" data-val="Tous" style="cursor:pointer;${histF.statut==="Tous"&&!tags.length?"outline:2px solid var(--blue);":""}"><div class="kpi-value" style="color:var(--blue)">${total}</div><div class="kpi-label">Total AO</div><div class="kpi-sub">tous périmètres</div></div>
